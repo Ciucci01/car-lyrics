@@ -1,3 +1,5 @@
+import 'package:car_play/screens/lyrics_list_view.dart';
+import 'package:car_play/screens/player_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
@@ -54,75 +56,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
           return Column(
             children: [
-              Expanded(child: LyricsListView(player: player)),
+              Expanded(child: LyricsListView()),
               PlayerControls(player: player),
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class LyricsListView extends StatelessWidget {
-  final PlayerProvider player;
-
-  LyricsListView({required this.player});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: player.lyrics!.lines.length,
-      itemBuilder: (context, index) {
-        final line = player.lyrics!.lines[index];
-        final isCurrentLine = index == player.currentLineIndex;
-
-        return ListTile(
-          title: Text(
-            line.words,
-            style: TextStyle(
-              color: isCurrentLine ? Colors.green : Colors.white70,
-              fontSize: isCurrentLine ? 20 : 16,
-              fontWeight: isCurrentLine ? FontWeight.bold : FontWeight.normal,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        );
-      },
-    );
-  }
-}
-
-class PlayerControls extends StatelessWidget {
-  final PlayerProvider player;
-
-  PlayerControls({required this.player});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      color: Colors.grey[900],
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          IconButton(
-            icon: Icon(Icons.skip_previous, color: Colors.white),
-            onPressed: player.skipToPrevious,
-          ),
-          IconButton(
-            icon: Icon(
-              player.isPlaying ? Icons.pause : Icons.play_arrow,
-              color: Colors.white,
-              size: 36,
-            ),
-            onPressed: player.togglePlayPause,
-          ),
-          IconButton(
-            icon: Icon(Icons.skip_next, color: Colors.white),
-            onPressed: player.skipToNext,
-          ),
-        ],
       ),
     );
   }
