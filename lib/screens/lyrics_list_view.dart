@@ -15,35 +15,37 @@ class _LyricsListViewState extends State<LyricsListView> {
   final ItemScrollController _scrollController = ItemScrollController();
   bool _autoScrollEnabled = true;
   int? _lastScrolledIndex;
-  PlayerProvider? _player;
+  PlayerProvider? _player; // nullable
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // rimuovo eventuale listener precedente
+    // rimuovo listener precedente se esiste
     _player?.removeListener(_onPlayerUpdate);
 
-    // prendo il nuovo player e aggiungo il listener
-    _player = Provider.of<PlayerProvider>(context);
+    // prendo il PlayerProvider corrente
+    _player = Provider.of<PlayerProvider>(context, listen: false);
     _player?.addListener(_onPlayerUpdate);
   }
 
   @override
   void dispose() {
-    _player?.removeListener(
-      _onPlayerUpdate,
-    ); // uso la variabile, non Provider.of
+    _player?.removeListener(_onPlayerUpdate); // sicuro, non uso context
     super.dispose();
   }
 
   void _onPlayerUpdate() {
     if (!mounted) return;
-    if (_autoScrollEnabled && _player!.currentLineIndex != _lastScrolledIndex) {
-      _lastScrolledIndex = _player!.currentLineIndex;
+
+    final player = _player;
+    if (player == null) return;
+
+    if (_autoScrollEnabled && player.currentLineIndex != _lastScrolledIndex) {
+      _lastScrolledIndex = player.currentLineIndex;
       _scrollToCurrentLine(
-        _player!.currentLineIndex,
-        _player!.lyrics!.lines.length,
+        player.currentLineIndex,
+        player.lyrics!.lines.length,
       );
     }
   }
@@ -51,9 +53,9 @@ class _LyricsListViewState extends State<LyricsListView> {
   void _scrollToCurrentLine(int index, int total) {
     if (_scrollController.isAttached) {
       _scrollController.scrollTo(
-        index: index + 1, // +1 per la riga vuota in cima
+        index: index + 1,
         duration: const Duration(milliseconds: 400),
-        alignment: 0.5, // sempre al centro
+        alignment: 0.5,
         curve: Curves.easeOut,
       );
     }
@@ -61,7 +63,11 @@ class _LyricsListViewState extends State<LyricsListView> {
 
   @override
   Widget build(BuildContext context) {
-    final player = _player!;
+    final player = _player;
+    if (player == null || player.lyrics == null) {
+      return const SizedBox.shrink(); // evita errori prima che player sia pronto
+    }
+
     final lyrics = player.lyrics!.lines;
 
     return Stack(
@@ -102,7 +108,6 @@ class _LyricsListViewState extends State<LyricsListView> {
             },
           ),
         ),
-
         if (!_autoScrollEnabled)
           Positioned(
             bottom: 20,
