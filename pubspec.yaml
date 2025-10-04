@@ -18,6 +18,7 @@ dependencies:
   webview_flutter: ^4.13.0
   shared_preferences: ^2.5.3
   scrollable_positioned_list: ^0.3.8
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
