@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:car_play/services/storage_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -13,7 +14,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 class PlayerProvider with ChangeNotifier {
   Lyrics? _lyrics;
   bool _isPlaying = false;
-  bool _isLoading = false;
+  bool _isLoading = true;
   bool _isConnected = false;
   String? _currentTrackId;
   int _currentLineIndex = 0;
@@ -27,6 +28,19 @@ class PlayerProvider with ChangeNotifier {
   String? _accessToken;
   static const String clientId = '1b41b88b438c4103a5cb6e75d3f6e004';
   static const String clientSecret = '0fc0f0bac5244630b92c60f7651d5aad';
+
+  PlayerProvider() {
+    TokenStorage.loadTokens()
+        .then((value) {
+          _isLoading = false;
+
+          if (value == null) return;
+          setAccessToken(value['access_token'], value['refresh_token']);
+        })
+        .whenComplete(() {
+          _isLoading = false;
+        });
+  }
 
   Future<void> connectSpotify(BuildContext context) async {
     _isLoading = true;
@@ -151,6 +165,7 @@ class PlayerProvider with ChangeNotifier {
   void setAccessToken(String token, String refreshToken) async {
     _accessToken = token;
     SpotifyService.initialize(token, refreshToken);
+    TokenStorage.saveTokens(token, refreshToken, 3600);
     _isConnected = true;
 
     await loadCurrentTrack();
@@ -160,6 +175,7 @@ class PlayerProvider with ChangeNotifier {
 
   Future<void> processAuthCode(String code) async {
     _isLoading = true;
+    print('setto true processAuthCode');
     notifyListeners();
 
     try {
@@ -188,11 +204,6 @@ class PlayerProvider with ChangeNotifier {
     }
   }
 
-  Future<void> testSpotify() async {
-    print('trackid: test');
-    await SpotifyService.pause();
-  }
-
   Future<void> loadLyrics(String trackId) async {
     _isLoading = true;
     notifyListeners();
@@ -203,7 +214,6 @@ class PlayerProvider with ChangeNotifier {
     } catch (e) {
       print('Error loading lyrics: $e');
     }
-
     _isLoading = false;
     notifyListeners();
   }

@@ -2,6 +2,7 @@ import 'package:car_play/screens/lyrics_list_view.dart';
 import 'package:car_play/screens/player_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../providers/player_provider.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -10,6 +11,12 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WakelockPlus.enable();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -24,11 +31,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
             return Center(child: CircularProgressIndicator());
           }
 
-          if (player.lyrics == null) {
+          if (!player.isConnected) {
             return Center(
               child: Column(
                 children: [
-                  Text(
+                  const Text(
                     'Connect to Spotify and play a song',
                     style: TextStyle(color: Colors.white),
                   ),
@@ -43,7 +50,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 30,
                         vertical: 15,
                       ),
@@ -54,11 +61,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
             );
           }
 
-          return Column(
-            children: [
-              Expanded(child: LyricsListView()),
-              PlayerControls(player: player),
-            ],
+          if (!player.isPlaying) {
+            return const Center(
+              child: Text(
+                'No song is playing',
+                style: TextStyle(color: Colors.white),
+              ),
+            );
+          }
+
+          if (player.lyrics != null) {
+            return Column(
+              children: [
+                Expanded(child: LyricsListView()),
+                PlayerControls(player: player),
+              ],
+            );
+          }
+          return const Center(
+            child: Text(
+              'No lyrics found',
+              style: TextStyle(color: Colors.white),
+            ),
           );
         },
       ),
