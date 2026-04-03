@@ -3,6 +3,7 @@ import 'package:car_play/screens/player_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:marquee/marquee.dart';
 import '../providers/player_provider.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -21,8 +22,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Spotify Lyrics'),
+        title: Consumer<PlayerProvider>(
+          builder: (context, player, _) {
+            if (player.trackName == null) {
+              return const Text('Spotify Lyrics');
+            }
+            return _buildTrackHeader(player);
+          },
+        ),
         backgroundColor: Colors.black,
+        centerTitle: false,
+        titleSpacing: 16,
       ),
       backgroundColor: Colors.black,
       body: Consumer<PlayerProvider>(
@@ -95,6 +105,64 @@ class _PlayerScreenState extends State<PlayerScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildTrackHeader(PlayerProvider player) {
+    return Row(
+      children: [
+        if (player.albumImageUrl != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.network(
+                player.albumImageUrl!,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: 22,
+                child: Marquee(
+                  key: ValueKey(player.currentTrackId),
+                  text: player.trackName ?? '',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  scrollAxis: Axis.horizontal,
+                  blankSpace: 50.0,
+                  velocity: 30.0,
+                  pauseAfterRound: const Duration(seconds: 2),
+                  startPadding: 0.0,
+                  accelerationDuration: const Duration(seconds: 1),
+                  accelerationCurve: Curves.linear,
+                  decelerationDuration: const Duration(milliseconds: 500),
+                  decelerationCurve: Curves.easeOut,
+                ),
+              ),
+              Text(
+                player.artistName ?? '',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

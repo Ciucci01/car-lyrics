@@ -110,6 +110,9 @@ class SpotifyService {
               ?.map((a) => a["name"])
               .toList() ??
           [],
+      'album_image': (playback["item"]?["album"]?["images"] as List?)?.isNotEmpty == true
+          ? playback["item"]["album"]["images"][0]["url"]
+          : null,
       'duration_ms': playback["item"]?["duration_ms"],
       'is_playing': playback["is_playing"],
       'progress_ms': playback["progress_ms"],
