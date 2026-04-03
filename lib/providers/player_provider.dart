@@ -18,12 +18,19 @@ class PlayerProvider with ChangeNotifier {
   bool _isLoading = true;
   bool _isConnected = false;
   String? _currentTrackId;
+  String? _trackName;
+  String? _artistName;
+  String? _albumImageUrl;
   int _currentLineIndex = 0;
 
   Lyrics? get lyrics => _lyrics;
   bool get isPlaying => _isPlaying;
   bool get isLoading => _isLoading;
   bool get isConnected => _isConnected;
+  String? get currentTrackId => _currentTrackId;
+  String? get trackName => _trackName;
+  String? get artistName => _artistName;
+  String? get albumImageUrl => _albumImageUrl;
   int get currentLineIndex => _currentLineIndex;
 
   String? _accessToken;
@@ -271,6 +278,10 @@ class PlayerProvider with ChangeNotifier {
         final playback = await SpotifyService.getCurrentPlayback();
         if (playback != null) {
           // Aggiorna track corrente
+          _trackName = playback['name'];
+          _artistName = (playback['artists'] as List?)?.join(', ');
+          _albumImageUrl = playback['album_image'];
+
           if (playback['id'] != null && playback['id'] != _currentTrackId) {
             _currentTrackId = playback['id'];
             await loadLyrics(playback['id']!);

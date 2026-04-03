@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   http: ^1.1.0
   provider: ^6.0.5
-  spotify: 0.13.7 # SOSTITUISCI spotify_sdk con questa
+  spotify: 0.13.7
   url_launcher: ^6.3.2
   crypto: ^3.0.6
   url_strategy: ^0.3.0
@@ -21,6 +21,7 @@ dependencies:
   flutter_launcher_icons: ^0.14.4
   wakelock_plus: ^1.4.0
   flutter_dotenv: ^6.0.0
+  marquee: ^2.2.3
 
 dev_dependencies:
   flutter_test:
