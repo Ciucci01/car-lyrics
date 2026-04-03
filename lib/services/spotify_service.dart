@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'auth_service.dart';
 
 class SpotifyService {
-  static const String clientId = '1b41b88b438c4103a5cb6e75d3f6e004';
-  static const String clientSecret = '0fc0f0bac5244630b92c60f7651d5aad';
-
   static String? _accessToken;
   static String? _refreshToken;
 
@@ -14,11 +12,54 @@ class SpotifyService {
     _refreshToken = refreshToken;
   }
 
+  static Future<http.Response> _request(
+    String method,
+    String url, {
+    Map<String, dynamic>? body,
+  }) async {
+    Future<http.Response> send() async {
+      final uri = Uri.parse(url);
+      final headers = {
+        "Authorization": "Bearer $_accessToken",
+        "Content-Type": "application/json",
+      };
+      if (method == 'GET') {
+        return http.get(uri, headers: headers);
+      } else if (method == 'POST') {
+        return http.post(
+          uri,
+          headers: headers,
+          body: body != null ? jsonEncode(body) : null,
+        );
+      } else if (method == 'PUT') {
+        return http.put(
+          uri,
+          headers: headers,
+          body: body != null ? jsonEncode(body) : null,
+        );
+      }
+      throw Exception("Unsupported method $method");
+    }
+
+    var response = await send();
+
+    // Se otteniamo 401, proviamo a refreshare il token
+    if (response.statusCode == 401 && _refreshToken != null) {
+      print("Access token scaduto, provo il refresh...");
+      final tokens = await SpotifyAuth.refreshTokens(_refreshToken!);
+      if (tokens != null) {
+        _accessToken = tokens['access_token'];
+        _refreshToken = tokens['refresh_token'];
+        // Riprova la richiesta originale con il nuovo token
+        response = await send();
+      }
+    }
+
+    return response;
+  }
+
   static Future<Map<String, dynamic>?> _get(String url) async {
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {"Authorization": "Bearer $_accessToken"},
-    );
+    final response = await _request('GET', url);
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -26,40 +67,23 @@ class SpotifyService {
     if (response.statusCode == 204) {
       return null; // Nessun contenuto
     }
-    throw Exception("GET $url failed: ${response.statusCode} ${response.body}");
+    print("GET $url failed: ${response.statusCode} ${response.body}");
+    return null;
   }
 
   static Future<void> _put(String url, [Map<String, dynamic>? body]) async {
-    final response = await http.put(
-      Uri.parse(url),
-      headers: {
-        "Authorization": "Bearer $_accessToken",
-        "Content-Type": "application/json",
-      },
-      body: body != null ? jsonEncode(body) : null,
-    );
+    final response = await _request('PUT', url, body: body);
     if (response.statusCode != 204 && response.statusCode != 200) {
-      throw Exception(
-        "PUT $url failed: ${response.statusCode} ${response.body}",
-      );
+      print("PUT $url failed: ${response.statusCode} ${response.body}");
     }
   }
 
   static Future<void> _post(String url, [Map<String, dynamic>? body]) async {
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        "Authorization": "Bearer $_accessToken",
-        "Content-Type": "application/json",
-      },
-      body: body != null ? jsonEncode(body) : null,
-    );
+    final response = await _request('POST', url, body: body);
     if (response.statusCode != 204 &&
         response.statusCode != 202 &&
         response.statusCode != 200) {
-      throw Exception(
-        "POST $url failed: ${response.statusCode} ${response.body}",
-      );
+      print("POST $url failed: ${response.statusCode} ${response.body}");
     }
   }
 
@@ -142,3 +166,4 @@ class SpotifyService {
     await _put(url);
   }
 }
+

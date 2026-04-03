@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/lyrics.dart';
 
 class LyricsService {
-  static const String baseUrl = 'http://100.117.190.80:5554';
+  static String get baseUrl => dotenv.env['LYRICS_BASE_URL'] ?? '';
 
   static Future<Lyrics> getLyrics(String trackId) async {
     try {
