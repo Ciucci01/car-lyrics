@@ -4,7 +4,11 @@ import 'package:url_strategy/url_strategy.dart';
 import 'providers/player_provider.dart';
 import 'screens/player_screen.dart';
 
-void main() {
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   setPathUrlStrategy();
   runApp(MyApp());
 }

@@ -1,14 +1,14 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:convert' show utf8, base64;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'storage_service.dart';
 
 class SpotifyAuth {
-  static const clientId = 'SPOTIFY_CLIENT_ID_RIMOSSO';
-  static const clientSecret = '0fc0f0bac5244630b92c60f7651d5aad';
+  static String get clientId => dotenv.env['SPOTIFY_CLIENT_ID'] ?? '';
+  static String get clientSecret => dotenv.env['SPOTIFY_CLIENT_SECRET'] ?? '';
 
-  static Future<String?> refreshAccessToken(String refreshToken) async {
+  static Future<Map<String, String>?> refreshTokens(String refreshToken) async {
     final basicAuth = base64.encode(utf8.encode('$clientId:$clientSecret'));
 
     final response = await http.post(
@@ -23,12 +23,17 @@ class SpotifyAuth {
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body);
       final newAccessToken = json['access_token'];
+      // Spotify potrebbe restituire un nuovo refresh_token
+      final newRefreshToken = json['refresh_token'] ?? refreshToken;
       final expiresIn = json['expires_in'] ?? 3600;
 
-      // aggiorna solo access token, refresh rimane lo stesso
-      await TokenStorage.saveTokens(newAccessToken, refreshToken, expiresIn);
+      // salva i nuovi token
+      await TokenStorage.saveTokens(newAccessToken, newRefreshToken, expiresIn);
 
-      return newAccessToken;
+      return {
+        'access_token': newAccessToken,
+        'refresh_token': newRefreshToken,
+      };
     } else {
       print("Errore refresh token: ${response.statusCode} ${response.body}");
       return null;

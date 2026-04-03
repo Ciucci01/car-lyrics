@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/lyrics.dart';
 import '../services/lyrics_service.dart';
 import '../services/spotify_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class PlayerProvider with ChangeNotifier {
@@ -26,19 +27,18 @@ class PlayerProvider with ChangeNotifier {
   int get currentLineIndex => _currentLineIndex;
 
   String? _accessToken;
-  static const String clientId = 'SPOTIFY_CLIENT_ID_RIMOSSO';
-  static const String clientSecret = '0fc0f0bac5244630b92c60f7651d5aad';
+  static String get clientId => dotenv.env['SPOTIFY_CLIENT_ID'] ?? '';
+  static String get clientSecret => dotenv.env['SPOTIFY_CLIENT_SECRET'] ?? '';
 
   PlayerProvider() {
     TokenStorage.loadTokens()
         .then((value) {
-          _isLoading = false;
-
           if (value == null) return;
-          setAccessToken(value['access_token'], value['refresh_token']);
+          setAccessToken(value['access_token'], value['refresh_token'], 3600);
         })
         .whenComplete(() {
           _isLoading = false;
+          notifyListeners();
         });
   }
 
@@ -151,8 +151,9 @@ class PlayerProvider with ChangeNotifier {
         final tokenData = json.decode(response.body);
         final accessToken = tokenData['access_token'];
         final refreshToken = tokenData['refresh_token'];
+        final expiresIn = tokenData['expires_in'] ?? 3600;
 
-        setAccessToken(accessToken, refreshToken);
+        setAccessToken(accessToken, refreshToken, expiresIn);
         return true;
       }
       return false;
@@ -162,10 +163,10 @@ class PlayerProvider with ChangeNotifier {
     }
   }
 
-  void setAccessToken(String token, String refreshToken) async {
+  void setAccessToken(String token, String refreshToken, int expiresIn) async {
     _accessToken = token;
     SpotifyService.initialize(token, refreshToken);
-    TokenStorage.saveTokens(token, refreshToken, 3600);
+    TokenStorage.saveTokens(token, refreshToken, expiresIn);
     _isConnected = true;
 
     await loadCurrentTrack();
