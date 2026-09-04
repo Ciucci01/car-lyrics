@@ -279,6 +279,44 @@ void main() {
     },
   );
 
+  test(
+    'una caduta a fianco di un "non ce l\'ho" non scrive la cache',
+    () async {
+      final cache = _FakeCache();
+      final repository = LyricsRepository(
+        providers: [
+          _FakeProvider(),
+          _FakeProvider(error: const LyricsProviderException('giu')),
+        ],
+        cache: cache,
+      );
+
+      final lyrics = await repository.lyricsFor(_query);
+
+      expect(lyrics, isNull);
+      expect(cache.writeMissingCalls, isEmpty);
+    },
+  );
+
+  test(
+    'una caduta a fianco di un non sincronizzato non scrive la cache',
+    () async {
+      final cache = _FakeCache();
+      final repository = LyricsRepository(
+        providers: [
+          _FakeProvider(error: const LyricsProviderException('giu')),
+          _FakeProvider(result: _unsynced),
+        ],
+        cache: cache,
+      );
+
+      final lyrics = await repository.lyricsFor(_query);
+
+      expect(lyrics!.lines.single.words, 'Semplice');
+      expect(cache.writeFoundCalls, isEmpty);
+    },
+  );
+
   test('un testo senza righe viene ignorato come inutilizzabile', () async {
     final repository = LyricsRepository(
       providers: [

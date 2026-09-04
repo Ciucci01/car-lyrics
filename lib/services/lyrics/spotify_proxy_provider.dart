@@ -23,9 +23,13 @@ class SpotifyProxyProvider implements LyricsProvider {
 
   @override
   Future<Lyrics?> fetch(LyricsQuery query) async {
-    final response = await _client
-        .get(Uri.parse('$baseUrl/?trackid=${query.trackId}'))
-        .timeout(_timeout);
+    // Uri.replace normalizza lo slash tra host e query string e fa
+    // l'URL-encoding del trackId: l'interpolazione diretta rompeva entrambe
+    // le cose se LYRICS_BASE_URL aveva uno slash finale.
+    final uri = Uri.parse(
+      baseUrl,
+    ).replace(queryParameters: {'trackid': query.trackId});
+    final response = await _client.get(uri).timeout(_timeout);
 
     if (response.statusCode == 404) return null;
     if (response.statusCode != 200) {
