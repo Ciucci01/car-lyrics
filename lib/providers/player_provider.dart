@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/lyrics.dart';
@@ -8,14 +9,18 @@ import '../models/playback_state.dart';
 import '../models/spotify_tokens.dart';
 import '../screens/spotify_auth_webview.dart';
 import '../services/auth_service.dart';
-import '../services/lyrics_service.dart';
+import '../services/lyrics/lrclib_provider.dart';
+import '../services/lyrics/lyrics_cache.dart';
+import '../services/lyrics/lyrics_provider.dart';
+import '../services/lyrics/lyrics_repository.dart';
+import '../services/lyrics/spotify_proxy_provider.dart';
 import '../services/spotify_service.dart';
 import '../services/storage_service.dart';
 import '../utils/app_log.dart';
 
 enum ConnectionStatus { initializing, disconnected, connecting, connected }
 
-enum LyricsStatus { idle, loading, ready, unavailable, failed }
+enum LyricsStatus { idle, loading, ready, unavailable, instrumental, failed }
 
 class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   static const _pollInterval = Duration(seconds: 5);
@@ -34,7 +39,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   final TokenStorage _storage;
   final SpotifyAuth _auth;
   final SpotifyService _spotify;
-  final LyricsService _lyricsService;
+  final LyricsRepository _lyricsRepository;
   final http.Client _httpClient;
 
   ConnectionStatus _status = ConnectionStatus.initializing;
@@ -62,13 +67,23 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     TokenStorage? storage,
     SpotifyAuth? auth,
     SpotifyService? spotify,
-    LyricsService? lyricsService,
+    LyricsRepository? lyricsRepository,
   }) {
     // Un solo client per tutta l'app: tre client sono tre pool di
     // connessioni separati per lo stesso identico traffico.
     final httpClient = http.Client();
     final resolvedStorage = storage ?? TokenStorage();
     final resolvedAuth = auth ?? SpotifyAuth(client: httpClient);
+
+    final proxyBaseUrl = dotenv.env['LYRICS_BASE_URL'] ?? '';
+    final providers = <LyricsProvider>[
+      // Il proxy Spotify entra in catena solo se configurato: il giorno che
+      // smette di esistere basta togliere la voce dal .env.
+      if (proxyBaseUrl.isNotEmpty)
+        SpotifyProxyProvider(baseUrl: proxyBaseUrl, client: httpClient),
+      LrclibProvider(client: httpClient),
+    ];
+
     return PlayerProvider._(
       storage: resolvedStorage,
       auth: resolvedAuth,
@@ -79,7 +94,8 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
             storage: resolvedStorage,
             client: httpClient,
           ),
-      lyricsService: lyricsService ?? LyricsService(client: httpClient),
+      lyricsRepository:
+          lyricsRepository ?? LyricsRepository(providers: providers),
       httpClient: httpClient,
     );
   }
@@ -88,16 +104,27 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     required TokenStorage storage,
     required SpotifyAuth auth,
     required SpotifyService spotify,
-    required LyricsService lyricsService,
+    required LyricsRepository lyricsRepository,
     required http.Client httpClient,
   }) : _storage = storage,
        _auth = auth,
        _spotify = spotify,
-       _lyricsService = lyricsService,
+       _lyricsRepository = lyricsRepository,
        _httpClient = httpClient {
     _spotify.onAuthLost = _handleAuthLost;
     WidgetsBinding.instance.addObserver(this);
     unawaited(_restoreSession());
+    unawaited(_attachCache());
+  }
+
+  /// La cache si apre dopo la costruzione: finche' non e' pronta la catena
+  /// funziona lo stesso, solo senza risparmiare richieste.
+  Future<void> _attachCache() async {
+    try {
+      _lyricsRepository.cache = await LyricsCache.open();
+    } catch (error, stackTrace) {
+      logError('Cache dei testi non disponibile', error, stackTrace);
+    }
   }
 
   ConnectionStatus get status => _status;
@@ -352,7 +379,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     _setAnchor(playback.progressMs, playback.isPlaying);
 
     if (previous?.trackId != playback.trackId) {
-      unawaited(_loadLyrics(playback.trackId));
+      unawaited(_loadLyrics(playback));
       notifyListeners();
       return;
     }
@@ -397,7 +424,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
-  Future<void> _loadLyrics(String trackId) async {
+  Future<void> _loadLyrics(PlaybackState playback) async {
     final requestId = ++_lyricsRequestId;
 
     _lyrics = null;
@@ -406,12 +433,24 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
 
     try {
-      final lyrics = await _lyricsService.getLyrics(trackId);
+      final lyrics = await _lyricsRepository.lyricsFor(
+        LyricsQuery(
+          trackId: playback.trackId,
+          title: playback.trackName,
+          primaryArtist: playback.primaryArtist,
+          albumName: playback.albumName,
+          durationMs: playback.durationMs,
+        ),
+      );
       // Risposta in ritardo di una traccia gia' cambiata: va ignorata, o
       // mostreremmo il testo della canzone precedente.
       if (requestId != _lyricsRequestId) return;
 
-      if (lyrics.isUsable) {
+      if (lyrics == null) {
+        _lyricsStatus = LyricsStatus.unavailable;
+      } else if (lyrics.instrumental) {
+        _lyricsStatus = LyricsStatus.instrumental;
+      } else if (lyrics.isUsable) {
         _lyrics = lyrics;
         _lyricsStatus = LyricsStatus.ready;
         _updateCurrentLine(estimatedProgressMs);
@@ -428,8 +467,8 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   }
 
   Future<void> retryLyrics() async {
-    final trackId = _playback?.trackId;
-    if (trackId != null) await _loadLyrics(trackId);
+    final playback = _playback;
+    if (playback != null) await _loadLyrics(playback);
   }
 
   Future<void> togglePlayPause() async {

@@ -17,7 +17,7 @@ Future<void> main() async {
   } catch (_) {
     configError =
         'No .env file found. Create one in the project root with '
-        'SPOTIFY_CLIENT_ID and LYRICS_BASE_URL.';
+        'SPOTIFY_CLIENT_ID.';
   }
 
   setPathUrlStrategy();
@@ -25,9 +25,10 @@ Future<void> main() async {
 }
 
 String? _describeMissingConfig() {
+  // LYRICS_BASE_URL e' facoltativa: senza il proxy Spotify la catena usa
+  // solo LRCLIB.
   final missing = [
     'SPOTIFY_CLIENT_ID',
-    'LYRICS_BASE_URL',
   ].where((key) => (dotenv.env[key] ?? '').isEmpty).toList();
   if (missing.isEmpty) return null;
   return 'Missing keys in .env: ${missing.join(', ')}.';
