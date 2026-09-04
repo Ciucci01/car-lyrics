@@ -45,6 +45,15 @@ void main() {
     expect(await provider.fetch(_query), isNull);
   });
 
+  test('restituisce null su 404 della fonte', () async {
+    final provider = SpotifyProxyProvider(
+      baseUrl: 'https://proxy.example',
+      client: MockClient((_) async => http.Response('', 404)),
+    );
+
+    expect(await provider.fetch(_query), isNull);
+  });
+
   test('solleva su errore del server', () async {
     final provider = SpotifyProxyProvider(
       baseUrl: 'https://proxy.example',
