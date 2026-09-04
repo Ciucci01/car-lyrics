@@ -23,6 +23,12 @@ Python plugin della CLI LibreLyrics, che autentica con TOTP contro l'API interna
 di Spotify scaricando a runtime un dizionario di segreti da una repo di terzi.
 Da un'app Flutter non e' chiamabile senza interporre un backend.
 
+Nota sul cookie `sp_dc`: dura circa un anno, non pochi mesi. Self-hostare
+`spotify-lyrics-api` costa quindi un rinnovo annuale, non una manutenzione
+ricorrente. Resta pero' vero che la durata del cookie non protegge dal motivo
+per cui quel progetto e' deprecato: il TOTP introdotto da Spotify rompe
+l'istanza a cookie ancora valido.
+
 ## Obiettivo
 
 Rendere il recupero dei testi resistente alla morte di una singola fonte, senza
