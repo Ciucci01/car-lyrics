@@ -1,11 +1,12 @@
-import 'package:car_play/providers/player_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../providers/player_provider.dart';
+
 class LyricsListView extends StatefulWidget {
-  LyricsListView({Key? key}) : super(key: key);
+  const LyricsListView({super.key});
 
   @override
   State<LyricsListView> createState() => _LyricsListViewState();
@@ -15,60 +16,74 @@ class _LyricsListViewState extends State<LyricsListView> {
   final ItemScrollController _scrollController = ItemScrollController();
   bool _autoScrollEnabled = true;
   int? _lastScrolledIndex;
-  PlayerProvider? _player; // nullable
+  String? _lastTrackId;
+  PlayerProvider? _player;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final player = Provider.of<PlayerProvider>(context, listen: false);
+    if (identical(player, _player)) return;
 
-    // rimuovo listener precedente se esiste
     _player?.removeListener(_onPlayerUpdate);
-
-    // prendo il PlayerProvider corrente
-    _player = Provider.of<PlayerProvider>(context, listen: false);
+    _player = player;
     _player?.addListener(_onPlayerUpdate);
   }
 
   @override
   void dispose() {
-    _player?.removeListener(_onPlayerUpdate); // sicuro, non uso context
+    _player?.removeListener(_onPlayerUpdate);
     super.dispose();
   }
 
   void _onPlayerUpdate() {
     if (!mounted) return;
-
     final player = _player;
     if (player == null) return;
 
-    if (_autoScrollEnabled && player.currentLineIndex != _lastScrolledIndex) {
+    final trackId = player.playback?.trackId;
+    if (trackId != _lastTrackId) {
+      _lastTrackId = trackId;
+      _lastScrolledIndex = null;
+      // La disattivazione vale solo per la canzone che l'utente stava
+      // sfogliando: sulla traccia nuova si riparte agganciati.
+      if (!_autoScrollEnabled) setState(() => _autoScrollEnabled = true);
+    }
+
+    if (!_autoScrollEnabled) return;
+    if (player.currentLineIndex == _lastScrolledIndex) return;
+
+    // L'indice si segna solo se lo scroll e' avvenuto davvero: al primo frame
+    // dopo il caricamento la lista non e' ancora agganciata, e darlo per fatto
+    // lascerebbe il testo fermo in cima fino al cambio riga successivo.
+    if (_scrollToLine(player.currentLineIndex)) {
       _lastScrolledIndex = player.currentLineIndex;
-      _scrollToCurrentLine(
-        player.currentLineIndex,
-        player.lyrics!.lines.length,
-      );
     }
   }
 
-  void _scrollToCurrentLine(int index, int total) {
-    if (_scrollController.isAttached) {
-      _scrollController.scrollTo(
-        index: index + 1,
-        duration: const Duration(milliseconds: 400),
-        alignment: 0.5,
-        curve: Curves.easeOut,
-      );
-    }
+  bool _scrollToLine(int lineIndex) {
+    if (!_scrollController.isAttached) return false;
+    _scrollController.scrollTo(
+      // +1 per lo spaziatore in testa alla lista.
+      index: (lineIndex < 0 ? 0 : lineIndex) + 1,
+      duration: const Duration(milliseconds: 400),
+      alignment: 0.5,
+      curve: Curves.easeOut,
+    );
+    return true;
   }
 
   @override
   Widget build(BuildContext context) {
-    final player = _player;
-    if (player == null || player.lyrics == null) {
-      return const SizedBox.shrink(); // evita errori prima che player sia pronto
-    }
+    final player = context.watch<PlayerProvider>();
+    final lines = player.lyrics?.lines;
+    if (lines == null || lines.isEmpty) return const SizedBox.shrink();
 
-    final lyrics = player.lyrics!.lines;
+    // Il primo centraggio puo' avvenire solo a lista agganciata, cioe' dopo
+    // questo frame.
+    if (_lastScrolledIndex == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onPlayerUpdate());
+    }
 
     return Stack(
       children: [
@@ -81,28 +96,29 @@ class _LyricsListViewState extends State<LyricsListView> {
             return false;
           },
           child: ScrollablePositionedList.builder(
-            itemCount: lyrics.length + 2,
+            itemCount: lines.length + 2,
             itemScrollController: _scrollController,
             itemBuilder: (context, index) {
-              if (index == 0 || index == lyrics.length + 1) {
+              if (index == 0 || index == lines.length + 1) {
                 return SizedBox(height: MediaQuery.of(context).size.height / 2);
               }
 
-              final realIndex = index - 1;
-              final line = lyrics[realIndex];
-              final isCurrentLine = realIndex == player.currentLineIndex;
+              final lineIndex = index - 1;
+              final isCurrent = lineIndex == player.currentLineIndex;
 
               return ListTile(
                 title: Text(
-                  line.words,
+                  lines[lineIndex].words,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: isCurrentLine ? Colors.green : Colors.white70,
-                    fontSize: isCurrentLine ? 20 : 16,
-                    fontWeight: isCurrentLine
+                    color: isCurrent
+                        ? const Color(0xFF1DB954)
+                        : Colors.white70,
+                    fontSize: isCurrent ? 20 : 16,
+                    fontWeight: isCurrent
                         ? FontWeight.bold
                         : FontWeight.normal,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               );
             },
@@ -113,11 +129,12 @@ class _LyricsListViewState extends State<LyricsListView> {
             bottom: 20,
             right: 20,
             child: FloatingActionButton(
-              child: const Icon(Icons.my_location),
+              tooltip: 'Follow the lyrics again',
               onPressed: () {
                 setState(() => _autoScrollEnabled = true);
-                _scrollToCurrentLine(player.currentLineIndex, lyrics.length);
+                _scrollToLine(player.currentLineIndex);
               },
+              child: const Icon(Icons.my_location),
             ),
           ),
       ],

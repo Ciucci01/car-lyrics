@@ -1,14 +1,18 @@
-import 'package:car_play/screens/lyrics_list_view.dart';
-import 'package:car_play/screens/player_controls.dart';
 import 'package:flutter/material.dart';
+import 'package:marquee/marquee.dart';
 import 'package:provider/provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:marquee/marquee.dart';
+
+import '../models/playback_state.dart';
 import '../providers/player_provider.dart';
+import 'lyrics_list_view.dart';
+import 'player_controls.dart';
 
 class PlayerScreen extends StatefulWidget {
+  const PlayerScreen({super.key});
+
   @override
-  _PlayerScreenState createState() => _PlayerScreenState();
+  State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
@@ -19,108 +23,199 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   @override
+  void dispose() {
+    WakelockPlus.disable();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Consumer<PlayerProvider>(
           builder: (context, player, _) {
-            if (player.trackName == null) {
-              return const Text('Spotify Lyrics');
-            }
-            return _buildTrackHeader(player);
+            final playback = player.playback;
+            if (playback == null) return const Text('Spotify Lyrics');
+            return _TrackHeader(playback: playback);
           },
         ),
-        backgroundColor: Colors.black,
-        centerTitle: false,
-        titleSpacing: 16,
+        actions: [
+          Consumer<PlayerProvider>(
+            builder: (context, player, _) {
+              if (!player.isConnected) return const SizedBox.shrink();
+              return IconButton(
+                icon: const Icon(Icons.logout),
+                tooltip: 'Disconnect',
+                onPressed: player.disconnect,
+              );
+            },
+          ),
+        ],
       ),
-      backgroundColor: Colors.black,
       body: Consumer<PlayerProvider>(
-        builder: (context, player, child) {
-          if (player.isLoading) {
-            return Center(child: CircularProgressIndicator());
+        builder: (context, player, _) {
+          if (player.isBusy) {
+            return const Center(child: CircularProgressIndicator());
           }
-
           if (!player.isConnected) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Connect to Spotify and play a song',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      Provider.of<PlayerProvider>(
-                        context,
-                        listen: false,
-                      ).connectSpotify(context);
-                    },
-                    child: Text('Connect to Spotify'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 30,
-                        vertical: 15,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return _ConnectView(error: player.authError);
           }
-
-          if (!player.isPlaying) {
-            return const Center(
-              child: Text(
-                'No song is playing',
-                style: TextStyle(color: Colors.white),
-              ),
-            );
-          }
-
-          if (player.lyrics != null) {
-            return Column(
-              children: [
-                Expanded(child: LyricsListView()),
-                PlayerControls(player: player),
-              ],
-            );
-          }
-          return const Center(
-            child: Text(
-              'No lyrics found',
-              style: TextStyle(color: Colors.white),
-            ),
-          );
+          return _PlaybackView(player: player);
         },
       ),
     );
   }
+}
 
-  Widget _buildTrackHeader(PlayerProvider player) {
+class _ConnectView extends StatelessWidget {
+  final String? error;
+
+  const _ConnectView({this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Connect to Spotify and play a song',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            ],
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () =>
+                  context.read<PlayerProvider>().connect(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1DB954),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 15,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text('Connect to Spotify'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaybackView extends StatelessWidget {
+  final PlayerProvider player;
+
+  const _PlaybackView({required this.player});
+
+  @override
+  Widget build(BuildContext context) {
+    if (player.playback == null) {
+      return const _Message(
+        icon: Icons.music_off,
+        text: 'No song playing.\nStart playback on any Spotify device.',
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(child: _buildLyricsArea()),
+        PlayerControls(player: player),
+      ],
+    );
+  }
+
+  Widget _buildLyricsArea() {
+    return switch (player.lyricsStatus) {
+      LyricsStatus.ready => const LyricsListView(),
+      LyricsStatus.unavailable => const _Message(
+        icon: Icons.lyrics_outlined,
+        text: 'No lyrics for this track',
+      ),
+      LyricsStatus.failed => _Message(
+        icon: Icons.cloud_off,
+        text: 'Could not load the lyrics',
+        action: TextButton(
+          onPressed: player.retryLyrics,
+          child: const Text('Retry'),
+        ),
+      ),
+      LyricsStatus.loading || LyricsStatus.idle => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    };
+  }
+}
+
+class _Message extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Widget? action;
+
+  const _Message({required this.icon, required this.text, this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 40, color: Colors.white38),
+            const SizedBox(height: 12),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, height: 1.4),
+            ),
+            if (action != null) ...[const SizedBox(height: 8), action!],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TrackHeader extends StatelessWidget {
+  final PlaybackState playback;
+
+  const _TrackHeader({required this.playback});
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       children: [
-        if (player.albumImageUrl != null)
+        if (playback.albumImageUrl != null)
           Padding(
-            padding: const EdgeInsets.only(right: 12.0),
+            padding: const EdgeInsets.only(right: 12),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: Image.network(
-                player.albumImageUrl!,
+                playback.albumImageUrl!,
                 width: 40,
                 height: 40,
                 fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox(width: 40, height: 40),
               ),
             ),
           ),
@@ -129,33 +224,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                height: 22,
-                child: Marquee(
-                  key: ValueKey(player.currentTrackId),
-                  text: player.trackName ?? '',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  scrollAxis: Axis.horizontal,
-                  blankSpace: 50.0,
-                  velocity: 30.0,
-                  pauseAfterRound: const Duration(seconds: 2),
-                  startPadding: 0.0,
-                  accelerationDuration: const Duration(seconds: 1),
-                  accelerationCurve: Curves.linear,
-                  decelerationDuration: const Duration(milliseconds: 500),
-                  decelerationCurve: Curves.easeOut,
-                ),
-              ),
+              SizedBox(height: 22, child: _buildTitle()),
               Text(
-                player.artistName ?? '',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                playback.artistName,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -163,6 +235,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTitle() {
+    const style = TextStyle(
+      color: Colors.white,
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+    );
+
+    // Marquee non accetta testo vuoto.
+    if (playback.trackName.isEmpty) {
+      return const Text('', style: style);
+    }
+
+    return Marquee(
+      key: ValueKey(playback.trackId),
+      text: playback.trackName,
+      style: style,
+      scrollAxis: Axis.horizontal,
+      blankSpace: 50,
+      velocity: 30,
+      pauseAfterRound: const Duration(seconds: 2),
+      startPadding: 0,
+      accelerationDuration: const Duration(seconds: 1),
+      accelerationCurve: Curves.linear,
+      decelerationDuration: const Duration(milliseconds: 500),
+      decelerationCurve: Curves.easeOut,
     );
   }
 }

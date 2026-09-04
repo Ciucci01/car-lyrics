@@ -1,36 +1,42 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/spotify_tokens.dart';
+
 class TokenStorage {
-  static Future<void> saveTokens(
-    String accessToken,
-    String refreshToken,
-    int expiresIn,
-  ) async {
+  static const _accessTokenKey = 'access_token';
+  static const _refreshTokenKey = 'refresh_token';
+  static const _expiryDateKey = 'expiry_date';
+
+  Future<void> save(SpotifyTokens tokens) async {
     final prefs = await SharedPreferences.getInstance();
-    final expiryDate =
-        DateTime.now().millisecondsSinceEpoch + (expiresIn * 1000);
-    await prefs.setString('access_token', accessToken);
-    await prefs.setString('refresh_token', refreshToken);
-    await prefs.setInt('expiry_date', expiryDate);
+    await prefs.setString(_accessTokenKey, tokens.accessToken);
+    await prefs.setString(_refreshTokenKey, tokens.refreshToken);
+    await prefs.setInt(
+      _expiryDateKey,
+      tokens.expiresAt.millisecondsSinceEpoch,
+    );
   }
 
-  static Future<Map<String, dynamic>?> loadTokens() async {
+  Future<SpotifyTokens?> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final accessToken = prefs.getString('access_token');
-    final refreshToken = prefs.getString('refresh_token');
-    final expiryDate = prefs.getInt('expiry_date');
+    final accessToken = prefs.getString(_accessTokenKey);
+    final refreshToken = prefs.getString(_refreshTokenKey);
+    final expiryDate = prefs.getInt(_expiryDateKey);
     if (accessToken == null || refreshToken == null || expiryDate == null) {
       return null;
     }
-    return {
-      'access_token': accessToken,
-      'refresh_token': refreshToken,
-      'expiry_date': expiryDate,
-    };
+
+    return SpotifyTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresAt: DateTime.fromMillisecondsSinceEpoch(expiryDate),
+    );
   }
 
-  static Future<void> clear() async {
+  Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await prefs.remove(_accessTokenKey);
+    await prefs.remove(_refreshTokenKey);
+    await prefs.remove(_expiryDateKey);
   }
 }
