@@ -35,6 +35,9 @@ class LyricsRepository {
           instrumental ??= result;
           continue;
         }
+        // Una fonte che non rispetta il contratto non deve poter avvelenare
+        // la cache ne' la schermata: vale come "non ce l'ho".
+        if (!result.isUsable) continue;
         if (result.isSynced) {
           await cache?.writeFound(query.trackId, result);
           return result;
