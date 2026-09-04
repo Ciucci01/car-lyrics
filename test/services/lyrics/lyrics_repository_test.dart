@@ -36,6 +36,18 @@ const _instrumental = Lyrics(
   instrumental: true,
 );
 
+const _badWithError = Lyrics(
+  error: true,
+  syncType: 'LINE_SYNCED',
+  lines: [LyricLine(startTimeMs: '900', words: 'Testo', endTimeMs: '0')],
+);
+
+const _badWithoutLines = Lyrics(
+  error: false,
+  syncType: 'LINE_SYNCED',
+  lines: [],
+);
+
 class _FakeProvider implements LyricsProvider {
   final Lyrics? result;
   final Object? error;
@@ -234,5 +246,49 @@ void main() {
 
     expect(lyrics!.lines.single.words, 'Semplice');
     expect(lyrics.instrumental, isFalse);
+  });
+
+  test('uno strumentale viene scritto in cache nel fallback', () async {
+    final cache = _FakeCache();
+    final repository = LyricsRepository(
+      providers: [_FakeProvider(result: _instrumental)],
+      cache: cache,
+    );
+
+    await repository.lyricsFor(_query);
+
+    expect(cache.writeFoundCalls, [_query.trackId]);
+  });
+
+  test(
+    'un testo con error: true viene ignorato e non avvelena la cache',
+    () async {
+      final cache = _FakeCache();
+      final repository = LyricsRepository(
+        providers: [
+          _FakeProvider(result: _badWithError),
+          _FakeProvider(result: _synced),
+        ],
+        cache: cache,
+      );
+
+      final lyrics = await repository.lyricsFor(_query);
+
+      expect(lyrics, _synced);
+      expect(cache.writeFoundCalls, [_query.trackId]);
+    },
+  );
+
+  test('un testo senza righe viene ignorato come inutilizzabile', () async {
+    final repository = LyricsRepository(
+      providers: [
+        _FakeProvider(result: _badWithoutLines),
+        _FakeProvider(result: _synced),
+      ],
+    );
+
+    final lyrics = await repository.lyricsFor(_query);
+
+    expect(lyrics, _synced);
   });
 }
