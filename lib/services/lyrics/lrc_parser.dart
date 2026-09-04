@@ -27,8 +27,16 @@ List<LyricLine> parseLrc(String body) {
     }
   }
 
-  result.sort((a, b) => a.startTime.compareTo(b.startTime));
-  return result;
+  // Ordina stabilmente per tempo crescente: quando due righe hanno lo stesso
+  // startTime (es. testo originale + traduzione), conserva l'ordine sorgente.
+  // List.sort non e' stabile per liste grandi, quindi usiamo l'indice
+  // originale come tiebreaker.
+  final indexed = result.asMap().entries.toList();
+  indexed.sort((a, b) {
+    final cmp = a.value.startTime.compareTo(b.value.startTime);
+    return cmp != 0 ? cmp : a.key.compareTo(b.key);
+  });
+  return indexed.map((e) => e.value).toList();
 }
 
 int _millisecondsOf(RegExpMatch match) {
