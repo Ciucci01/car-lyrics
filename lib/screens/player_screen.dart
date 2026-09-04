@@ -149,6 +149,10 @@ class _PlaybackView extends StatelessWidget {
         icon: Icons.lyrics_outlined,
         text: 'No lyrics for this track',
       ),
+      LyricsStatus.instrumental => const _Message(
+        icon: Icons.music_note,
+        text: 'Instrumental track',
+      ),
       LyricsStatus.failed => _Message(
         icon: Icons.cloud_off,
         text: 'Could not load the lyrics',

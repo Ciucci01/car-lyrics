@@ -14,8 +14,10 @@ UI strings and user-facing error messages are in English; code comments are in I
 
 ```
 SPOTIFY_CLIENT_ID=...
-LYRICS_BASE_URL=...      # external lyrics service, queried as $LYRICS_BASE_URL/?trackid=<spotifyTrackId>
+LYRICS_BASE_URL=...      # optional: Spotify-lyrics proxy, queried as $LYRICS_BASE_URL/?trackid=<spotifyTrackId>
 ```
+
+`LYRICS_BASE_URL` is optional: leaving it empty (or unset) simply drops the Spotify proxy out of the lyrics provider chain described below, and LRCLIB serves lyrics on its own.
 
 No client secret: auth uses PKCE. The Spotify app registration must whitelist the redirect URI `car-play://callback`.
 
@@ -94,13 +96,19 @@ A `429` throws with `retryAfter` populated from the header, and `_noteFailure` p
 
 ### Lyrics
 
-`LyricsService` hits `LYRICS_BASE_URL`, which returns Spotify's own lyrics shape (`syncType`, `lines[]` with `startTimeMs`/`words`). `Lyrics.isUsable` requires a non-empty `lines` list and no `error`, where `error` counts **only if the payload says `error: true`** — a missing field is not an error. Defaulting that field to `true` would silently report "no lyrics" for every track whose response omits it.
+`LyricsRepository` replaced the old single-endpoint `LyricsService`: it holds an ordered list of `LyricsProvider`s and asks them in turn. The chain is `SpotifyProxyProvider` (only added when `LYRICS_BASE_URL` is set) followed by `LrclibProvider`, which always runs. The rule is "first synced source wins": the first provider to return a synced result short-circuits the search; an unsynced result is kept as a fallback and only returned once the whole chain has run without finding anything better; an instrumental result is a fallback of last resort, weaker than an unsynced one.
+
+Each provider follows the same outcome contract as `SpotifyService`: returning `null` means "I don't have it" (legitimately no lyrics), while throwing means "I don't know" (network error, timeout, malformed response). `LyricsRepository.lyricsFor` mirrors that at the chain level — it returns `null` only when every source explicitly said "not mine", and throws `LyricsProviderException` only when every source failed outright. A provider that throws does not stop the chain; only if *all* of them throw does the repository give up. That distinction reaches `PlayerProvider._loadLyrics` unchanged: `null` becomes `LyricsStatus.unavailable`, a thrown exception becomes `LyricsStatus.failed` (the only state with a Retry button), and an instrumental result becomes `LyricsStatus.instrumental`.
+
+`LyricsCache` persists resolved outcomes (found or missing) as one JSON file per track ID under the app's documents directory, capped at 200 entries with least-recently-modified eviction, and negative ("missing") entries expire after 7 days so a track that gets lyrics added later on LRCLIB can be found again. The cache is attached to the repository asynchronously after `PlayerProvider` is constructed (`LyricsCache.open()` needs `await`, and the provider itself must stay synchronous for `ChangeNotifierProvider`); until it attaches, the chain still works, just without caching. `LyricsRepository.cache` is deliberately non-`final` to allow this.
+
+`Lyrics.isUsable` requires a non-empty `lines` list and no `error`, where `error` counts **only if the payload says `error: true`** — a missing field is not an error. Defaulting that field to `true` would silently report "no lyrics" for every track whose response omits it.
 
 `Lyrics.isSynced` gates the highlighting. An `UNSYNCED` payload has every line at `startTimeMs: "0"`, and the "last line already started" scan would then pin the highlight to the final line for the whole song; such lyrics are rendered but not followed. As with `error`, the polarity is deliberate: only a declared `UNSYNCED` (or lines that are all at zero) turns following off, so an absent or unrecognised `syncType` keeps working.
 
 `_loadLyrics` stamps each request with `_lyricsRequestId` and drops responses that arrive after a track change — without that guard a slow response paints the previous song's lyrics over the new track. `_resetPlaybackState()` bumps the same counter, since a disconnect or a stop invalidates an in-flight fetch just as much as a track change does.
 
-State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `failed`), and `PlayerScreen` renders a distinct view per case, with a Retry button on `failed`.
+State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `instrumental` / `failed`), and `PlayerScreen` renders a distinct view per case, with a Retry button on `failed`.
 
 `LyricsListView` renders with `ScrollablePositionedList` and inserts a half-screen spacer at each end, so **list index = lyric index + 1**. `currentLineIndex` is `-1` before the first line starts, meaning nothing is highlighted. Scrolling is driven by a provider listener (a side effect), while highlighting comes from `context.watch` in `build`. A user drag disables auto-scroll until the recenter FAB is tapped or the track changes.
 
