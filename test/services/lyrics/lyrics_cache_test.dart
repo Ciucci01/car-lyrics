@@ -60,13 +60,40 @@ void main() {
   test('sfratta la voce piu vecchia oltre il tetto', () async {
     final small = LyricsCache(directory, maxEntries: 2);
 
+    // Scrivi tre file e impostane esplicitamente la data di modifica
+    // per garantire un ordine deterministico (mtime non sempre ha
+    // granularita' sufficientemente fine per Future.delayed).
     await small.writeFound('a', _lyrics);
-    await Future.delayed(const Duration(milliseconds: 10));
+    final fileA = File('${directory.path}/a.json');
+    fileA.setLastModifiedSync(
+      DateTime.now().subtract(const Duration(hours: 3)),
+    );
+
     await small.writeFound('b', _lyrics);
-    await Future.delayed(const Duration(milliseconds: 10));
+    final fileB = File('${directory.path}/b.json');
+    fileB.setLastModifiedSync(
+      DateTime.now().subtract(const Duration(hours: 2)),
+    );
+
     await small.writeFound('c', _lyrics);
+    // 'c' mantiene la data attuale (piu recente).
 
     expect(await small.read('a'), isNull);
     expect(await small.read('c'), isNotNull);
+  });
+
+  test('non conta i file non-.json verso il tetto', () async {
+    final small = LyricsCache(directory, maxEntries: 1);
+
+    // Scrivi un file .json e un file non-.json
+    await small.writeFound('track1', _lyrics);
+    File('${directory.path}/stray.txt').writeAsStringSync('junk');
+
+    // Scrivi un secondo file .json: dovrebbe sfrattare track1 ma non stray.txt
+    await small.writeFound('track2', _lyrics);
+
+    expect(await small.read('track1'), isNull);
+    expect(await small.read('track2'), isNotNull);
+    expect(File('${directory.path}/stray.txt').existsSync(), isTrue);
   });
 }

@@ -52,7 +52,16 @@ class LyricsCache {
           json['cachedAt'] as int,
         );
         if (DateTime.now().difference(cachedAt) > _negativeTtl) {
-          await file.delete();
+          try {
+            await file.delete();
+          } catch (deleteError, deleteStackTrace) {
+            // La cancellazione potrebbe fallire (permessi, file gia scomparso).
+            logError(
+              'Pulizia cache scaduta fallita per $trackId',
+              deleteError,
+              deleteStackTrace,
+            );
+          }
           return null;
         }
         return const CacheHit(null);
@@ -62,7 +71,17 @@ class LyricsCache {
     } catch (error, stackTrace) {
       // Voce corrotta: si butta e si riparte dalla rete.
       logError('Voce di cache illeggibile per $trackId', error, stackTrace);
-      await file.delete();
+      try {
+        await file.delete();
+      } catch (deleteError, deleteStackTrace) {
+        // La cancellazione potrebbe fallire (permessi, file gia scomparso).
+        // Una cache che non si ripulisce e' un peggioramento, non un guasto.
+        logError(
+          'Pulizia cache fallita per $trackId',
+          deleteError,
+          deleteStackTrace,
+        );
+      }
       return null;
     }
   }
@@ -93,7 +112,11 @@ class LyricsCache {
   }
 
   Future<void> _evict() async {
-    final files = directory.listSync().whereType<File>().toList();
+    final files = directory
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.json'))
+        .toList();
     if (files.length <= maxEntries) return;
 
     files.sort((a, b) => a.lastModifiedSync().compareTo(b.lastModifiedSync()));
