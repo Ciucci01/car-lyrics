@@ -48,7 +48,7 @@ main.dart ──> ChangeNotifierProvider(PlayerProvider) ──> PlayerScreen
                             SpotifyAuthWebView is pushed as a route during login
 ```
 
-Services are **instances wired through `PlayerProvider`'s factory constructor** (`TokenStorage` → `SpotifyAuth` → `SpotifyService`, plus `LyricsService`), all injectable via named parameters. Nothing is static, so a fake `http.Client` is enough to exercise any of them.
+Services are **instances wired through `PlayerProvider`'s factory constructor** (`TokenStorage` → `SpotifyAuth` → `SpotifyService`, plus the `LyricsRepository` chain), all injectable via named parameters. Nothing is static, so a fake `http.Client` is enough to exercise any of them.
 
 ### Two timers, two different jobs
 
