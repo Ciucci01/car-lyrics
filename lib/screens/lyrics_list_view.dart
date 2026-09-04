@@ -111,13 +111,9 @@ class _LyricsListViewState extends State<LyricsListView> {
                   lines[lineIndex].words,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: isCurrent
-                        ? const Color(0xFF1DB954)
-                        : Colors.white70,
+                    color: isCurrent ? const Color(0xFF1DB954) : Colors.white70,
                     fontSize: isCurrent ? 20 : 16,
-                    fontWeight: isCurrent
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               );

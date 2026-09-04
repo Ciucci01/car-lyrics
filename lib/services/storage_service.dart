@@ -11,10 +11,7 @@ class TokenStorage {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accessTokenKey, tokens.accessToken);
     await prefs.setString(_refreshTokenKey, tokens.refreshToken);
-    await prefs.setInt(
-      _expiryDateKey,
-      tokens.expiresAt.millisecondsSinceEpoch,
-    );
+    await prefs.setInt(_expiryDateKey, tokens.expiresAt.millisecondsSinceEpoch);
   }
 
   Future<SpotifyTokens?> load() async {
