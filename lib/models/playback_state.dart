@@ -2,6 +2,11 @@ class PlaybackState {
   final String trackId;
   final String trackName;
   final String artistName;
+
+  /// LRCLIB abbina su un artista singolo: artistName e' la lista unita con
+  /// ", " e non combacerebbe.
+  final String primaryArtist;
+  final String? albumName;
   final String? albumImageUrl;
   final int durationMs;
   final bool isPlaying;
@@ -11,6 +16,8 @@ class PlaybackState {
     required this.trackId,
     required this.trackName,
     required this.artistName,
+    required this.primaryArtist,
+    required this.albumName,
     required this.albumImageUrl,
     required this.durationMs,
     required this.isPlaying,
@@ -26,12 +33,17 @@ class PlaybackState {
         ?.map((artist) => artist['name'] as String?)
         .whereType<String>()
         .toList();
-    final images = item['album']?['images'] as List?;
+    final album = item['album'] as Map<String, dynamic>?;
+    final images = album?['images'] as List?;
 
     return PlaybackState(
       trackId: id,
       trackName: item['name'] as String? ?? '',
       artistName: artists?.join(', ') ?? '',
+      primaryArtist: (artists != null && artists.isNotEmpty)
+          ? artists.first
+          : '',
+      albumName: album?['name'] as String?,
       albumImageUrl: (images != null && images.isNotEmpty)
           ? images.first['url'] as String?
           : null,
@@ -46,6 +58,8 @@ class PlaybackState {
       trackId: trackId,
       trackName: trackName,
       artistName: artistName,
+      primaryArtist: primaryArtist,
+      albumName: albumName,
       albumImageUrl: albumImageUrl,
       durationMs: durationMs,
       isPlaying: isPlaying ?? this.isPlaying,
