@@ -180,9 +180,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
         return;
       }
       if (result.error != null || result.code == null) {
-        _failConnect(
-          'Login failed: ${result.error ?? 'no code returned'}',
-        );
+        _failConnect('Login failed: ${result.error ?? 'no code returned'}');
         return;
       }
       if (result.state != expectedState) {
@@ -462,10 +460,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   /// consistent per qualche centinaio di millisecondi: risincronizzare subito
   /// rileggerebbe lo stato precedente e ribalterebbe l'aggiornamento
   /// ottimistico appena mostrato all'utente.
-  Future<void> _runCommand(
-    String what,
-    Future<void> Function() command,
-  ) async {
+  Future<void> _runCommand(String what, Future<void> Function() command) async {
     try {
       await command();
     } catch (error, stackTrace) {

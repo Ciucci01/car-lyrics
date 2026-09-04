@@ -25,9 +25,10 @@ Future<void> main() async {
 }
 
 String? _describeMissingConfig() {
-  final missing = ['SPOTIFY_CLIENT_ID', 'LYRICS_BASE_URL']
-      .where((key) => (dotenv.env[key] ?? '').isEmpty)
-      .toList();
+  final missing = [
+    'SPOTIFY_CLIENT_ID',
+    'LYRICS_BASE_URL',
+  ].where((key) => (dotenv.env[key] ?? '').isEmpty).toList();
   if (missing.isEmpty) return null;
   return 'Missing keys in .env: ${missing.join(', ')}.';
 }

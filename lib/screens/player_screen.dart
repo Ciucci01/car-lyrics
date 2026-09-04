@@ -99,8 +99,7 @@ class _ConnectView extends StatelessWidget {
             ],
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () =>
-                  context.read<PlayerProvider>().connect(context),
+              onPressed: () => context.read<PlayerProvider>().connect(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1DB954),
                 foregroundColor: Colors.white,
@@ -158,9 +157,8 @@ class _PlaybackView extends StatelessWidget {
           child: const Text('Retry'),
         ),
       ),
-      LyricsStatus.loading || LyricsStatus.idle => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      LyricsStatus.loading ||
+      LyricsStatus.idle => const Center(child: CircularProgressIndicator()),
     };
   }
 }
