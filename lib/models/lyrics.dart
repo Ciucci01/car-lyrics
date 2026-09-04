@@ -3,10 +3,15 @@ class Lyrics {
   final String syncType;
   final List<LyricLine> lines;
 
+  /// LRCLIB segnala cosi' i brani senza parole: e' un esito diverso da
+  /// "testo non trovato" e va mostrato in modo diverso.
+  final bool instrumental;
+
   const Lyrics({
     required this.error,
     required this.syncType,
     required this.lines,
+    this.instrumental = false,
   });
 
   factory Lyrics.fromJson(Map<String, dynamic> json) {
@@ -15,15 +20,30 @@ class Lyrics {
       // tutto il campo, e un default a true spegnerebbe i lyrics ovunque.
       error: json['error'] == true,
       syncType: json['syncType'] ?? '',
+      instrumental: json['instrumental'] == true,
       lines: List<LyricLine>.from(
         (json['lines'] ?? []).map((line) => LyricLine.fromJson(line)),
       ),
     );
   }
 
+  Map<String, dynamic> toJson() => {
+    'error': error,
+    'syncType': syncType,
+    'instrumental': instrumental,
+    'lines': [
+      for (final line in lines)
+        {
+          'startTimeMs': line.startTimeMs,
+          'words': line.words,
+          'endTimeMs': line.endTimeMs,
+        },
+    ],
+  };
+
   /// lines e' il segnale affidabile: se il servizio non ha righe da dare,
   /// non c'e' testo da mostrare, comunque abbia formulato la risposta.
-  bool get isUsable => !error && lines.isNotEmpty;
+  bool get isUsable => !error && lines.isNotEmpty && !instrumental;
 
   /// Solo un UNSYNCED dichiarato, o righe tutte a timestamp zero, escludono
   /// la sincronizzazione. Un syncType assente o sconosciuto resta trattato
