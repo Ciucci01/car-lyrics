@@ -90,4 +90,54 @@ void main() {
       throwsA(isA<LyricsProviderException>()),
     );
   });
+
+  test(
+    'cade su testo semplice quando i testi sincronizzati non hanno timestamp',
+    () async {
+      final provider = LrclibProvider(
+        client: MockClient(
+          (_) async => http.Response(
+            '{"instrumental":false,'
+            '"syncedLyrics":"plain text with no timestamps",'
+            '"plainLyrics":"Prima\\nSeconda"}',
+            200,
+          ),
+        ),
+      );
+
+      final lyrics = await provider.fetch(_query);
+
+      expect(lyrics!.syncType, 'UNSYNCED');
+      expect(lyrics.isSynced, isFalse);
+      expect(lyrics.lines.length, 2);
+    },
+  );
+
+  test('omette album_name quando non presente', () async {
+    late Uri requested;
+    const queryNoAlbum = LyricsQuery(
+      trackId: 'abc123',
+      title: 'Song Title',
+      primaryArtist: 'Artist',
+      albumName: null,
+      durationMs: 180000,
+    );
+    final provider = LrclibProvider(
+      client: MockClient((request) async {
+        requested = request.url;
+        return http.Response(
+          '{"instrumental":false,'
+          '"syncedLyrics":"[00:10.00] Verso",'
+          '"plainLyrics":"Verso"}',
+          200,
+        );
+      }),
+    );
+
+    await provider.fetch(queryNoAlbum);
+
+    expect(requested.queryParameters.containsKey('album_name'), isFalse);
+    expect(requested.queryParameters['track_name'], 'Song Title');
+    expect(requested.queryParameters['artist_name'], 'Artist');
+  });
 }
