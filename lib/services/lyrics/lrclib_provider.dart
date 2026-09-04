@@ -65,8 +65,11 @@ class LrclibProvider implements LyricsProvider {
         error: false,
         syncType: 'UNSYNCED',
         lines: [
-          for (final verse in plain.split('\n'))
-            LyricLine(startTimeMs: '0', words: verse, endTimeMs: '0'),
+          // Un CRLF lascia un '\r' di coda su ogni riga, e le righe vuote di
+          // separazione tra le strofe non sono versi da mostrare.
+          for (final verse in plain.split('\n').map((v) => v.trim()))
+            if (verse.isNotEmpty)
+              LyricLine(startTimeMs: '0', words: verse, endTimeMs: '0'),
         ],
       );
     }

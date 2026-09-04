@@ -7,7 +7,11 @@ import 'lyrics_provider.dart';
 ///
 /// Regola: vince il primo testo sincronizzato incontrato. Un testo non
 /// sincronizzato viene tenuto da parte e usato solo se la catena finisce
-/// senza trovarne uno migliore.
+/// senza trovarne uno migliore. La cache (fuori dal caso sincronizzato, che
+/// scrive subito) si aggiorna solo se la catena e' arrivata in fondo senza
+/// che nessuna fonte cadesse: un esito ottenuto con una caduta di mezzo non
+/// e' una risposta definitiva e non va congelato ne' come positivo ne' come
+/// negativo.
 class LyricsRepository {
   final List<LyricsProvider> providers;
 
@@ -49,9 +53,17 @@ class LyricsRepository {
       }
     }
 
+    // La catena e' "completa" solo se nessuna fonte e' caduta lungo la
+    // strada: con una caduta di mezzo l'esito non e' una risposta definitiva
+    // ("nessuna fonte ha il testo"), e' "non lo so per almeno una fonte". Un
+    // esito del genere si puo' restituire, ma non scrivere in cache: altrimenti
+    // un fallback degradato diventa un positivo permanente, o un buco di rete
+    // diventa un negativo di sette giorni per un brano che il testo ce l'ha.
+    final chainCompleted = failures == 0;
+
     final chosen = bestUnsynced ?? instrumental;
     if (chosen != null) {
-      await cache?.writeFound(query.trackId, chosen);
+      if (chainCompleted) await cache?.writeFound(query.trackId, chosen);
       return chosen;
     }
 
@@ -61,7 +73,7 @@ class LyricsRepository {
       throw const LyricsProviderException('Nessuna fonte raggiungibile');
     }
 
-    await cache?.writeMissing(query.trackId);
+    if (chainCompleted) await cache?.writeMissing(query.trackId);
     return null;
   }
 }

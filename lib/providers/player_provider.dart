@@ -500,10 +500,19 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   /// rileggerebbe lo stato precedente e ribalterebbe l'aggiornamento
   /// ottimistico appena mostrato all'utente.
   Future<void> _runCommand(String what, Future<void> Function() command) async {
-    try {
-      await command();
-    } catch (error, stackTrace) {
-      _noteFailure(what, error, stackTrace);
+    final blockedUntil = _pollBlockedUntil;
+    final backoffActive =
+        blockedUntil != null && DateTime.now().isBefore(blockedUntil);
+    if (backoffActive) {
+      // Il backoff vale anche qui: un comando che continua a bussare durante
+      // un 429 allunga la finestra di blocco tanto quanto un poll periodico.
+      logInfo('$what: comando saltato, backoff attivo fino a $blockedUntil');
+    } else {
+      try {
+        await command();
+      } catch (error, stackTrace) {
+        _noteFailure(what, error, stackTrace);
+      }
     }
     // La rilettura serve anche dopo un errore: se il comando non e' passato,
     // l'aggiornamento ottimistico va corretto.
