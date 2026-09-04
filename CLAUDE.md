@@ -23,8 +23,6 @@ No client secret: auth uses PKCE. The Spotify app registration must whitelist th
 
 ## Commands
 
-The Flutter SDK is not on PATH in this environment — these assume an installation is available.
-
 ```bash
 flutter pub get                    # after any pubspec.yaml change
 flutter run -d <device>            # android is the primary target; chrome also works
@@ -83,6 +81,8 @@ Token lifecycle in `SpotifyService._send()`:
 3. refreshes are deduplicated through `_pendingRefresh`, because Spotify rotates the refresh token on every exchange and parallel refreshes would invalidate each other;
 4. a definitive refresh failure clears storage and fires `onAuthLost`, which drops the provider back to `disconnected`.
 
+**Known trade-off:** `TokenStorage` keeps the Spotify refresh token in plain `SharedPreferences`, not `flutter_secure_storage`. On a non-rooted device that is covered by normal app sandboxing, so this is a deliberate, currently-undecided trade-off rather than an oversight — not a gap nobody noticed. If it needs to change, the move is `flutter_secure_storage` plus a migration step for installs that already have a token in `SharedPreferences`.
+
 ### Errors: "nothing playing" vs "don't know"
 
 `SpotifyService` keeps these strictly apart, and it matters more than it looks:
@@ -98,7 +98,9 @@ A `429` throws with `retryAfter` populated from the header, and `_noteFailure` p
 
 `LyricsRepository` replaced the old single-endpoint `LyricsService`: it holds an ordered list of `LyricsProvider`s and asks them in turn. The chain is `SpotifyProxyProvider` (only added when `LYRICS_BASE_URL` is set) followed by `LrclibProvider`, which always runs. The rule is "first synced source wins": the first provider to return a synced result short-circuits the search; an unsynced result is kept as a fallback and only returned once the whole chain has run without finding anything better; an instrumental result is a fallback of last resort, weaker than an unsynced one.
 
-Each provider follows the same outcome contract as `SpotifyService`: returning `null` means "I don't have it" (legitimately no lyrics), while throwing means "I don't know" (network error, timeout, malformed response). `LyricsRepository.lyricsFor` mirrors that at the chain level — it returns `null` only when every source explicitly said "not mine", and throws `LyricsProviderException` only when every source failed outright. A provider that throws does not stop the chain; only if *all* of them throw does the repository give up. That distinction reaches `PlayerProvider._loadLyrics` unchanged: `null` becomes `LyricsStatus.unavailable`, a thrown exception becomes `LyricsStatus.failed` (the only state with a Retry button), and an instrumental result becomes `LyricsStatus.instrumental`.
+Each provider follows the same outcome contract as `SpotifyService`: returning `null` means "I don't have it" (legitimately no lyrics), while throwing means "I don't know" (network error, timeout, malformed response). `LyricsRepository.lyricsFor` mirrors that at the chain level, but only for the *return value*: it returns `null` when the chain finishes without a usable result, and throws `LyricsProviderException` only when every source failed outright. A provider that throws does not stop the chain; only if *all* of them throw does the repository give up. That distinction reaches `PlayerProvider._loadLyrics` unchanged: `null` becomes `LyricsStatus.unavailable`, a thrown exception becomes `LyricsStatus.failed` (the only state with a Retry button), and an instrumental result becomes `LyricsStatus.instrumental`.
+
+What is *cached* is stricter than what is *returned*. A synced result is written and returned the moment it is found, before the rest of the chain can matter. Every other write — the post-loop fallback (`bestUnsynced ?? instrumental`) and `writeMissing` — happens only if the chain ran to completion with zero failures. With two providers, one answering "not mine" and the other throwing is the ordinary case once the Spotify proxy is end-of-life and LRCLIB has a bad day on mobile data: the repository still returns `null` (or the unsynced fallback) so the screen shows something reasonable, but it will not freeze that answer into the cache, positive or negative, because it never actually found out whether lyrics exist. Persisting a non-answer would either bury usable lyrics behind a 7-day negative entry or make a degraded fallback permanent, since positive entries never expire.
 
 `LyricsCache` persists resolved outcomes (found or missing) as one JSON file per track ID under the app's documents directory, capped at 200 entries with least-recently-modified eviction, and negative ("missing") entries expire after 7 days so a track that gets lyrics added later on LRCLIB can be found again. The cache is attached to the repository asynchronously after `PlayerProvider` is constructed (`LyricsCache.open()` needs `await`, and the provider itself must stay synchronous for `ChangeNotifierProvider`); until it attaches, the chain still works, just without caching. `LyricsRepository.cache` is deliberately non-`final` to allow this.
 
