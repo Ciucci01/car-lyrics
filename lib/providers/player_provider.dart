@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -154,7 +155,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
 
     var value = _anchorProgressMs;
     if (_anchorIsPlaying) {
-      value += DateTime.now().difference(anchorAt).inMilliseconds;
+      value += clock.now().difference(anchorAt).inMilliseconds;
     }
 
     final duration = _playback?.durationMs ?? 0;
@@ -303,7 +304,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     // allunga la finestra di blocco invece di accorciarla.
     final blockedUntil = _pollBlockedUntil;
     if (blockedUntil != null) {
-      if (DateTime.now().isBefore(blockedUntil)) return;
+      if (clock.now().isBefore(blockedUntil)) return;
       _pollBlockedUntil = null;
     }
 
@@ -337,7 +338,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   /// Registra un errore e, se Spotify ha imposto un'attesa, la rispetta.
   void _noteFailure(String what, Object error, StackTrace stackTrace) {
     if (error is SpotifyApiException && error.retryAfter != null) {
-      _pollBlockedUntil = DateTime.now().add(error.retryAfter!);
+      _pollBlockedUntil = clock.now().add(error.retryAfter!);
       logInfo('Polling sospeso per ${error.retryAfter!.inSeconds}s');
     }
     logError(what, error, stackTrace);
@@ -392,7 +393,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   void _setAnchor(int progressMs, bool isPlaying) {
     _anchorProgressMs = progressMs;
     _anchorIsPlaying = isPlaying;
-    _anchorAt = DateTime.now();
+    _anchorAt = clock.now();
   }
 
   void _tick() {
@@ -501,7 +502,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<void> _runCommand(String what, Future<void> Function() command) async {
     final blockedUntil = _pollBlockedUntil;
     final backoffActive =
-        blockedUntil != null && DateTime.now().isBefore(blockedUntil);
+        blockedUntil != null && clock.now().isBefore(blockedUntil);
     if (backoffActive) {
       // Il backoff vale anche qui: un comando che continua a bussare durante
       // un 429 allunga la finestra di blocco tanto quanto un poll periodico.
