@@ -87,7 +87,11 @@ Token lifecycle in `SpotifyService._send()`:
 3. refreshes are deduplicated through `_pendingRefresh`, because Spotify rotates the refresh token on every exchange and parallel refreshes would invalidate each other;
 4. a definitive refresh failure clears storage and fires `onAuthLost`, which drops the provider back to `disconnected`.
 
-**Known trade-off:** `TokenStorage` keeps the Spotify refresh token in plain `SharedPreferences`, not `flutter_secure_storage`. On a non-rooted device that is covered by normal app sandboxing, so this is a deliberate, currently-undecided trade-off rather than an oversight — not a gap nobody noticed. If it needs to change, the move is `flutter_secure_storage` plus a migration step for installs that already have a token in `SharedPreferences`.
+`TokenStorage` keeps all three values — access token, refresh token, expiry — in `flutter_secure_storage`, which wraps its key in the Android Keystore. All three travel together on purpose: splitting the expiry into a second store is two things that can drift apart. Biometric options are deliberately not used; an app meant to start with the phone already in its cradle should not put a fingerprint in front of launch.
+
+Earlier installs kept those values in plain `SharedPreferences`. `load()` therefore falls back to reading them from there, rewrites them into secure storage and empties the old keys — once per install, so an upgrade does not cost a login. A *partial* leftover is dropped rather than migrated, and the old keys are cleared either way: an incomplete set is unusable, and leaving it would keep a token in cleartext forever.
+
+**Failures are absorbed, not propagated.** The Keystore really can become unreadable — a restore from backup, a wipe of the device credentials. A read that throws is logged and becomes `null`, so the user signs in again instead of meeting a crash; it deliberately does *not* fall back to `SharedPreferences`, which would undo the point. A write that throws is logged and swallowed: the tokens are still valid in memory, and a session that otherwise works should not die because it could not be persisted. Nothing is deleted on a read failure — the data is already unreadable, and the next successful `save()` overwrites it anyway.
 
 ### Errors: "nothing playing" vs "don't know"
 
