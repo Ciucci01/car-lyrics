@@ -28,7 +28,7 @@ flutter pub get                    # after any pubspec.yaml change
 flutter run -d <device>            # android is the primary target; chrome also works
 flutter analyze                    # lint (flutter_lints + prefer_const_constructors)
 dart format lib                    # 80-column formatting
-flutter test                       # no tests exist yet; there is no test/ directory
+flutter test                       # unit tests only; no widget tests
 flutter build apk --release        # see signing below
 dart run flutter_launcher_icons    # regenerate launcher icons from assets/icon/icon.png
 ```
@@ -49,6 +49,8 @@ main.dart ──> ChangeNotifierProvider(PlayerProvider) ──> PlayerScreen
 Services are **instances wired through `PlayerProvider`'s factory constructor** (`TokenStorage` → `SpotifyAuth` → `SpotifyService`, plus `SpotifyAuthenticator` and the `LyricsRepository` chain), all injectable via named parameters. Nothing is static, so a fake `http.Client` is enough to exercise any of them.
 
 ### Two timers, two different jobs
+
+**`PlayerProvider` never calls `DateTime.now()`** — every reading of the current instant goes through `clock.now()` from `package:clock`. In production the two are the same thing. In tests they are not: `fake_async` hands the provider a clock it controls, so twelve seconds of polling and a hundred and twenty ticks resolve instantly and deterministically. Reintroducing a bare `DateTime.now()` here does not fail the build — it quietly makes that code path untestable, because half of what this class does is arithmetic on elapsed time.
 
 This is the core of the design and the thing to understand before touching playback:
 
