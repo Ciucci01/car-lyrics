@@ -1,172 +1,199 @@
-import 'dart:async';
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
+import '../models/playback_state.dart';
+import '../models/spotify_tokens.dart';
+import '../utils/app_log.dart';
 import 'auth_service.dart';
+import 'storage_service.dart';
 
+/// Errore per cui lo stato della riproduzione resta *ignoto*.
+///
+/// Va tenuto distinto dal 204 "non sta suonando niente": il primo non deve
+/// toccare quello che stiamo gia' mostrando, il secondo si'.
+class SpotifyApiException implements Exception {
+  final String message;
+  final int? statusCode;
+
+  /// Valorizzato solo per il 429: quanto Spotify chiede di aspettare prima di
+  /// ripresentarsi. Chi cattura deve rispettarlo, non solo registrarlo.
+  final Duration? retryAfter;
+
+  const SpotifyApiException(this.message, [this.statusCode, this.retryAfter]);
+
+  @override
+  String toString() => statusCode == null
+      ? 'SpotifyApiException: $message'
+      : 'SpotifyApiException($statusCode): $message';
+}
+
+/// Client della Web API di Spotify.
+///
+/// Non riproduce nulla in locale: pilota il dispositivo attivo sulla sessione
+/// Spotify Connect dell'utente, quindi ogni comando richiede che qualcosa sia
+/// gia' in riproduzione altrove.
 class SpotifyService {
-  static String? _accessToken;
-  static String? _refreshToken;
+  static const _base = 'https://api.spotify.com/v1';
 
-  static void initialize(String accessToken, String refreshToken) {
-    _accessToken = accessToken;
-    _refreshToken = refreshToken;
+  /// Senza timeout una richiesta appesa bloccherebbe il polling a tempo
+  /// indeterminato: il guard sul poll in corso non si sbloccherebbe mai.
+  static const _requestTimeout = Duration(seconds: 10);
+
+  final SpotifyAuth _auth;
+  final TokenStorage _storage;
+  final http.Client _client;
+
+  SpotifyTokens? _tokens;
+  Future<bool>? _pendingRefresh;
+
+  /// Invocata quando il refresh fallisce in modo definitivo e serve un
+  /// nuovo login.
+  void Function()? onAuthLost;
+
+  SpotifyService({
+    required SpotifyAuth auth,
+    required TokenStorage storage,
+    http.Client? client,
+  }) : _auth = auth,
+       _storage = storage,
+       _client = client ?? http.Client();
+
+  bool get hasTokens => _tokens != null;
+
+  void adoptTokens(SpotifyTokens tokens) {
+    _tokens = tokens;
   }
 
-  static Future<http.Response> _request(
+  void clearTokens() {
+    _tokens = null;
+  }
+
+  /// Un solo refresh alla volta: senza questo guard le richieste in volo
+  /// scadute partirebbero tutte insieme a rinnovare, invalidandosi a vicenda
+  /// perche' Spotify ruota il refresh token ad ogni scambio.
+  Future<bool> _refreshTokens() {
+    final pending = _pendingRefresh;
+    if (pending != null) return pending;
+
+    final refreshToken = _tokens?.refreshToken;
+    if (refreshToken == null) return Future.value(false);
+
+    final future = _auth
+        .refresh(refreshToken)
+        .then((tokens) async {
+          if (tokens == null) {
+            logError('Refresh non riuscito, sessione da rifare');
+            _tokens = null;
+            await _storage.clear();
+            onAuthLost?.call();
+            return false;
+          }
+          _tokens = tokens;
+          await _storage.save(tokens);
+          return true;
+        })
+        .whenComplete(() => _pendingRefresh = null);
+
+    _pendingRefresh = future;
+    return future;
+  }
+
+  Future<http.Response> _send(
     String method,
-    String url, {
+    Uri uri, {
     Map<String, dynamic>? body,
   }) async {
-    Future<http.Response> send() async {
-      final uri = Uri.parse(url);
-      final headers = {
-        "Authorization": "Bearer $_accessToken",
-        "Content-Type": "application/json",
-      };
-      if (method == 'GET') {
-        return http.get(uri, headers: headers);
-      } else if (method == 'POST') {
-        return http.post(
-          uri,
-          headers: headers,
-          body: body != null ? jsonEncode(body) : null,
-        );
-      } else if (method == 'PUT') {
-        return http.put(
-          uri,
-          headers: headers,
-          body: body != null ? jsonEncode(body) : null,
-        );
-      }
-      throw Exception("Unsupported method $method");
+    if (_tokens == null) {
+      throw const SpotifyApiException('Nessuna sessione attiva');
     }
 
-    var response = await send();
-
-    // Se otteniamo 401, proviamo a refreshare il token
-    if (response.statusCode == 401 && _refreshToken != null) {
-      print("Access token scaduto, provo il refresh...");
-      final tokens = await SpotifyAuth.refreshTokens(_refreshToken!);
-      if (tokens != null) {
-        _accessToken = tokens['access_token'];
-        _refreshToken = tokens['refresh_token'];
-        // Riprova la richiesta originale con il nuovo token
-        response = await send();
+    // Rinnovo proattivo: se il token e' gia' scaduto evitiamo del tutto il 401.
+    if (_tokens!.isExpired()) {
+      final refreshed = await _refreshTokens();
+      if (!refreshed) {
+        throw const SpotifyApiException('Rinnovo del token non riuscito');
       }
     }
 
+    var response = await _dispatch(method, uri, body);
+    if (response.statusCode == 401 && await _refreshTokens()) {
+      response = await _dispatch(method, uri, body);
+    }
+    if (response.statusCode == 429) {
+      // Continuare a bussare allunga la finestra di punizione: l'attesa
+      // richiesta viaggia con l'eccezione perche' il chiamante la applichi.
+      final seconds = int.tryParse(response.headers['retry-after'] ?? '') ?? 5;
+      throw SpotifyApiException(
+        'Rate limit Spotify',
+        429,
+        Duration(seconds: seconds),
+      );
+    }
     return response;
   }
 
-  static Future<Map<String, dynamic>?> _get(String url) async {
-    final response = await _request('GET', url);
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    }
-    if (response.statusCode == 204) {
-      return null; // Nessun contenuto
-    }
-    print("GET $url failed: ${response.statusCode} ${response.body}");
-    return null;
-  }
-
-  static Future<void> _put(String url, [Map<String, dynamic>? body]) async {
-    final response = await _request('PUT', url, body: body);
-    if (response.statusCode != 204 && response.statusCode != 200) {
-      print("PUT $url failed: ${response.statusCode} ${response.body}");
-    }
-  }
-
-  static Future<void> _post(String url, [Map<String, dynamic>? body]) async {
-    final response = await _request('POST', url, body: body);
-    if (response.statusCode != 204 &&
-        response.statusCode != 202 &&
-        response.statusCode != 200) {
-      print("POST $url failed: ${response.statusCode} ${response.body}");
-    }
-  }
-
-  /// Ottiene la traccia corrente
-  static Future<String?> getCurrentTrackId() async {
-    final playback = await _get(
-      "https://api.spotify.com/v1/me/player/currently-playing",
-    );
-    return playback?["item"]?["id"];
-  }
-
-  /// Ottiene dettagli completi della riproduzione
-  static Future<Map<String, dynamic>?> getCurrentPlayback() async {
-    final playback = await _get(
-      "https://api.spotify.com/v1/me/player/currently-playing",
-    );
-    if (playback == null) return null;
-
-    return {
-      'id': playback["item"]?["id"],
-      'name': playback["item"]?["name"],
-      'artists':
-          (playback["item"]?["artists"] as List?)
-              ?.map((a) => a["name"])
-              .toList() ??
-          [],
-      'album_image': (playback["item"]?["album"]?["images"] as List?)?.isNotEmpty == true
-          ? playback["item"]["album"]["images"][0]["url"]
-          : null,
-      'duration_ms': playback["item"]?["duration_ms"],
-      'is_playing': playback["is_playing"],
-      'progress_ms': playback["progress_ms"],
+  Future<http.Response> _dispatch(
+    String method,
+    Uri uri,
+    Map<String, dynamic>? body,
+  ) {
+    final headers = {
+      'Authorization': 'Bearer ${_tokens!.accessToken}',
+      'Content-Type': 'application/json',
     };
+    final encoded = body != null ? jsonEncode(body) : null;
+
+    final Future<http.Response> request = switch (method) {
+      'GET' => _client.get(uri, headers: headers),
+      'POST' => _client.post(uri, headers: headers, body: encoded),
+      'PUT' => _client.put(uri, headers: headers, body: encoded),
+      _ => throw ArgumentError('Metodo non supportato: $method'),
+    };
+    return request.timeout(_requestTimeout);
   }
 
-  /// Metti la prossima traccia
-  static Future<void> next() async {
-    await _post("https://api.spotify.com/v1/me/player/next");
+  /// Restituisce null solo per il 204, cioe' "non c'e' niente da mostrare".
+  /// Ogni altro esito diventa un'eccezione, perche' significa "non lo so".
+  Future<Map<String, dynamic>?> _get(String path) async {
+    final response = await _send('GET', Uri.parse('$_base$path'));
+    if (response.statusCode == 204) return null;
+    if (response.statusCode != 200) {
+      throw SpotifyApiException(
+        'GET $path fallita: ${response.body}',
+        response.statusCode,
+      );
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  /// Metti la traccia precedente
-  static Future<void> previous() async {
-    await _post("https://api.spotify.com/v1/me/player/previous");
+  Future<void> _command(
+    String method,
+    String path, [
+    Map<String, dynamic>? body,
+  ]) async {
+    final response = await _send(method, Uri.parse('$_base$path'), body: body);
+    if (response.statusCode >= 300) {
+      throw SpotifyApiException(
+        '$method $path fallita: ${response.body}',
+        response.statusCode,
+      );
+    }
   }
 
-  /// Avvia la riproduzione di un brano specifico
-  static Future<void> play(String trackId) async {
-    await _put("https://api.spotify.com/v1/me/player/play", {
-      "uris": ["spotify:track:$trackId"],
-    });
+  /// Stato della riproduzione, o null quando non c'e' nulla in riproduzione.
+  /// Solleva [SpotifyApiException] se lo stato non e' determinabile.
+  Future<PlaybackState?> currentPlayback() async {
+    final json = await _get('/me/player/currently-playing');
+    if (json == null) return null;
+    return PlaybackState.parse(json);
   }
 
-  /// Metti in pausa
-  static Future<void> pause() async {
-    await _put("https://api.spotify.com/v1/me/player/pause");
-  }
+  Future<void> next() => _command('POST', '/me/player/next');
 
-  /// Riprendi la riproduzione
-  static Future<void> resume() async {
-    await _put("https://api.spotify.com/v1/me/player/play");
-  }
+  Future<void> previous() => _command('POST', '/me/player/previous');
 
-  /// Ottieni la posizione corrente
-  static Future<int?> getPosition() async {
-    final playback = await _get(
-      "https://api.spotify.com/v1/me/player/currently-playing",
-    );
-    return playback?["progress_ms"];
-  }
+  Future<void> pause() => _command('PUT', '/me/player/pause');
 
-  /// Verifica se sta suonando
-  static Future<bool> getIsPlaying() async {
-    final playback = await _get(
-      "https://api.spotify.com/v1/me/player/currently-playing",
-    );
-    return playback?["is_playing"] ?? false;
-  }
-
-  /// Vai ad una posizione precisa
-  static Future<void> seekToPosition(int positionMs) async {
-    final url =
-        "https://api.spotify.com/v1/me/player/seek?position_ms=$positionMs";
-    await _put(url);
-  }
+  Future<void> resume() => _command('PUT', '/me/player/play');
 }
-
