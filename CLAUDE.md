@@ -43,10 +43,10 @@ One screen, no router, and a single `ChangeNotifier` holding all state.
 main.dart ──> ChangeNotifierProvider(PlayerProvider) ──> PlayerScreen
                                                           ├── LyricsListView   (auto-scrolling lyrics)
                                                           └── PlayerControls   (prev / play-pause / next)
-                            SpotifyAuthWebView is pushed as a route during login
+                            SpotifyAuthenticator opens the system browser during login
 ```
 
-Services are **instances wired through `PlayerProvider`'s factory constructor** (`TokenStorage` → `SpotifyAuth` → `SpotifyService`, plus the `LyricsRepository` chain), all injectable via named parameters. Nothing is static, so a fake `http.Client` is enough to exercise any of them.
+Services are **instances wired through `PlayerProvider`'s factory constructor** (`TokenStorage` → `SpotifyAuth` → `SpotifyService`, plus `SpotifyAuthenticator` and the `LyricsRepository` chain), all injectable via named parameters. Nothing is static, so a fake `http.Client` is enough to exercise any of them.
 
 ### Two timers, two different jobs
 
@@ -71,9 +71,15 @@ Optimistic UI: `togglePlayPause` re-anchors from the current estimate and notifi
 
 `SpotifyAuth` implements the authorization-code flow with PKCE — no client secret anywhere, since anything in the bundle is extractable from the APK. Each login generates a random verifier, sends its SHA-256 challenge, and validates the returned `state`.
 
-The flow never leaves the app: `SpotifyAuthWebView` loads the authorize URL and intercepts `car-play://callback` in its `NavigationDelegate`, so the custom scheme is **not** registered in the manifest. The route pops with a `SpotifyAuthResult`, so backing out simply yields `null` — there is no completer that can hang, and a main-frame load error pops with an error instead of leaving a blank page.
+The authorize URL opens in the **system browser**, per RFC 8252: `SpotifyAuthenticator` is a thin wrapper over `flutter_web_auth_2`, which uses Chrome Auth Tab on Android and `ASWebAuthenticationSession` on iOS. The user therefore types their password into a view the app does not control, and the federated "Continue with Google/Apple" buttons work — inside an embedded WebView they are often blocked, which locked out anyone whose account was created that way. This replaced the old in-app `SpotifyAuthWebView`.
 
-**Known trade-off:** RFC 8252 says native apps should use the system browser, not an embedded WebView. This app has always used a WebView, and two consequences are worth knowing before shipping widely: the user types their password into a view the app controls, and federated "Continue with Google/Apple" buttons are often blocked inside embedded WebViews — so accounts created that way may be unable to log in at all. Moving to `flutter_web_auth_2` (Custom Tabs / `ASWebAuthenticationSession`) would keep the same never-hangs property. Untested on device.
+Because the callback arrives from outside the app, the custom scheme **is** registered: `com.linusu.flutter_web_auth_2.CallbackActivity` is declared in `AndroidManifest.xml` with an intent filter for `car-play`. iOS needs nothing in `Info.plist` — `ASWebAuthenticationSession` matches the scheme itself.
+
+`authenticate()` returns `null` when the user backs out — the plugin signals that as a `PlatformException` with code `CANCELED`, and cancelling is not an error worth showing. Any other `PlatformException` becomes a `SpotifyAuthResult` carrying its message, so the caller's flow is unchanged.
+
+**The authorize URL always carries `show_dialog=true`,** and that is not decoration. The system browser keeps its own Spotify cookies, which `disconnect()` cannot reach: without the flag the authorize page would approve itself and hand back the same account, making logout a no-op for anyone trying to switch. The cost is one extra confirmation tap, and only on an explicit login — reopening the app still resumes from the stored refresh token.
+
+**Untested on device**, including whether the federated buttons actually work. Login on **web** does not work and did not before: the flow would need an `http` redirect URI and a callback page.
 
 Token lifecycle in `SpotifyService._send()`:
 1. **proactive** — refresh if the stored expiry is within 60s;
@@ -122,7 +128,7 @@ State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `i
 - Failures that a user can act on become a state (`authError`, `LyricsStatus.failed`), not just a log line.
 - A failure whose outcome is *unknown* must never overwrite known-good state with an empty one.
 - Anything that opens a route from the provider takes a `NavigatorState` resolved before the state change, not a `BuildContext` — notifying listeners unmounts the widget the context came from.
-- `disconnect()` also clears the WebView cookies, otherwise the next login silently re-enters the same account.
+- `disconnect()` cannot clear the browser's Spotify session — that is what `show_dialog=true` on the authorize URL is for.
 - One `http.Client` is created in the factory, shared by all three services and closed in `dispose()` — not one pool per service.
 - A parsed-but-unused field is a trap, not documentation: `error` and `syncType` both sat unread until they were wired up, and both needed their default polarity chosen carefully at that point.
 - `applicationId` is still `com.example.car_play`.

@@ -7,13 +7,13 @@ import 'package:http/http.dart' as http;
 import '../models/lyrics.dart';
 import '../models/playback_state.dart';
 import '../models/spotify_tokens.dart';
-import '../screens/spotify_auth_webview.dart';
 import '../services/auth_service.dart';
 import '../services/lyrics/lrclib_provider.dart';
 import '../services/lyrics/lyrics_cache.dart';
 import '../services/lyrics/lyrics_provider.dart';
 import '../services/lyrics/lyrics_repository.dart';
 import '../services/lyrics/spotify_proxy_provider.dart';
+import '../services/spotify_authenticator.dart';
 import '../services/spotify_service.dart';
 import '../services/storage_service.dart';
 import '../utils/app_log.dart';
@@ -38,6 +38,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
 
   final TokenStorage _storage;
   final SpotifyAuth _auth;
+  final SpotifyAuthenticator _authenticator;
   final SpotifyService _spotify;
   final LyricsRepository _lyricsRepository;
   final http.Client _httpClient;
@@ -66,6 +67,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   factory PlayerProvider({
     TokenStorage? storage,
     SpotifyAuth? auth,
+    SpotifyAuthenticator? authenticator,
     SpotifyService? spotify,
     LyricsRepository? lyricsRepository,
   }) {
@@ -87,6 +89,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     return PlayerProvider._(
       storage: resolvedStorage,
       auth: resolvedAuth,
+      authenticator: authenticator ?? const SpotifyAuthenticator(),
       spotify:
           spotify ??
           SpotifyService(
@@ -103,11 +106,13 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   PlayerProvider._({
     required TokenStorage storage,
     required SpotifyAuth auth,
+    required SpotifyAuthenticator authenticator,
     required SpotifyService spotify,
     required LyricsRepository lyricsRepository,
     required http.Client httpClient,
   }) : _storage = storage,
        _auth = auth,
+       _authenticator = authenticator,
        _spotify = spotify,
        _lyricsRepository = lyricsRepository,
        _httpClient = httpClient {
@@ -171,16 +176,12 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> connect(BuildContext context) async {
+  Future<void> connect() async {
     if (!_auth.isConfigured) {
       _authError = 'SPOTIFY_CLIENT_ID is missing from .env';
       notifyListeners();
       return;
     }
-
-    // Il navigator va risolto adesso: la notifica qui sotto smonta il widget
-    // da cui arriva questo context, e con esso la sua validita'.
-    final navigator = Navigator.of(context);
 
     _status = ConnectionStatus.connecting;
     _authError = null;
@@ -189,8 +190,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     try {
       final verifier = SpotifyAuth.createCodeVerifier();
       final expectedState = SpotifyAuth.createState();
-      final result = await SpotifyAuthWebView.show(
-        navigator,
+      final result = await _authenticator.authenticate(
         authorizeUrl: _auth.authorizeUrl(
           redirectUri: redirectUri,
           scopes: _scopes,
@@ -262,7 +262,6 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     _stopPolling();
     _spotify.clearTokens();
     await _storage.clear();
-    await SpotifyAuthWebView.clearSession();
     _resetPlaybackState();
     _status = ConnectionStatus.disconnected;
     _authError = null;
