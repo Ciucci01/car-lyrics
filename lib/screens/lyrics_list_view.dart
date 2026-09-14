@@ -13,6 +13,11 @@ class LyricsListView extends StatefulWidget {
 }
 
 class _LyricsListViewState extends State<LyricsListView> {
+  // Frazione dell'altezza a cui si ferma il bordo alto della riga corrente.
+  // A 0.5 sarebbe centrata, e in orizzontale restano due righe passate e una
+  // sola futura; tenendola nel primo quarto si vede piu' testo in arrivo.
+  static const double _lineAlignment = 0.25;
+
   final ItemScrollController _scrollController = ItemScrollController();
   bool _autoScrollEnabled = true;
   int? _lastScrolledIndex;
@@ -67,7 +72,7 @@ class _LyricsListViewState extends State<LyricsListView> {
       // +1 per lo spaziatore in testa alla lista.
       index: (lineIndex < 0 ? 0 : lineIndex) + 1,
       duration: const Duration(milliseconds: 400),
-      alignment: 0.5,
+      alignment: _lineAlignment,
       curve: Curves.easeOut,
     );
     return true;
@@ -99,8 +104,17 @@ class _LyricsListViewState extends State<LyricsListView> {
             itemCount: lines.length + 2,
             itemScrollController: _scrollController,
             itemBuilder: (context, index) {
+              // Gli spaziatori seguono _lineAlignment: in testa ne serve
+              // quanto basta a far salire la prima riga fino a quel punto, in
+              // coda tutto il resto, altrimenti le ultime righe non
+              // raggiungono la posizione e restano piu' in basso.
               if (index == 0 || index == lines.length + 1) {
-                return SizedBox(height: MediaQuery.of(context).size.height / 2);
+                final height = MediaQuery.of(context).size.height;
+                return SizedBox(
+                  height: index == 0
+                      ? height * _lineAlignment
+                      : height * (1 - _lineAlignment),
+                );
               }
 
               final lineIndex = index - 1;
