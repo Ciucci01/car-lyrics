@@ -131,4 +131,4 @@ State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `i
 - `disconnect()` cannot clear the browser's Spotify session — that is what `show_dialog=true` on the authorize URL is for.
 - One `http.Client` is created in the factory, shared by all three services and closed in `dispose()` — not one pool per service.
 - A parsed-but-unused field is a trap, not documentation: `error` and `syncType` both sat unread until they were wired up, and both needed their default polarity chosen carefully at that point.
-- `applicationId` is still `com.example.car_play`.
+- The published identity is `com.ciuccihub.carlyrics`, labelled "Car Lyrics" — Android, iOS and web. The Flutter package is still named `car_play`, and so are the logger name and the LRCLIB `User-Agent`: those are internal and nothing outside reads them. macOS, Linux and Windows are not targets and still carry `com.example`.
