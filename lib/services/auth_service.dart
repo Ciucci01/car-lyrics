@@ -60,6 +60,10 @@ class SpotifyAuth {
         'state': state,
         'code_challenge_method': 'S256',
         'code_challenge': codeChallenge,
+        // Il browser di sistema conserva i cookie di Spotify anche dopo il
+        // nostro logout: senza questo la pagina approverebbe da sola e
+        // rientreremmo sempre nello stesso account.
+        'show_dialog': 'true',
       },
     );
   }
