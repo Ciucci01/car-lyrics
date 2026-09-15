@@ -31,6 +31,11 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   static const _commandSettleDelay = Duration(milliseconds: 400);
 
   static const redirectUri = 'car-play://callback';
+
+  /// Quello che Spotify mette nel redirect quando l'utente preme Cancel
+  /// sulla schermata di conferma.
+  static const _userDeniedError = 'access_denied';
+
   static const _scopes = [
     'user-read-playback-state',
     'user-modify-playback-state',
@@ -183,6 +188,12 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
       notifyListeners();
       return;
     }
+    // Il pulsante sparisce appena lo stato passa a connecting, ma fra la
+    // notifica e il ridisegno passa un frame. Due tocchi dentro quella
+    // finestra lascerebbero la prima authenticate() appesa per sempre: il
+    // plugin tiene una sola callback per schema e la seconda sovrascrive la
+    // prima senza completarla.
+    if (_status == ConnectionStatus.connecting) return;
 
     _status = ConnectionStatus.connecting;
     _authError = null;
@@ -201,14 +212,20 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
         redirectUri: redirectUri,
       );
 
-      if (result == null) {
-        // Login annullato: nessun errore da mostrare.
+      if (result == null || result.error == _userDeniedError) {
+        // Uscire dal browser e negare il consenso sono la stessa rinuncia.
+        // Con show_dialog=true la schermata di conferma, col suo Cancel, sta
+        // davanti a ogni login esplicito: e' un percorso comune, non un caso
+        // limite, e non va mostrato come un errore.
         _status = ConnectionStatus.disconnected;
         notifyListeners();
         return;
       }
       if (result.error != null || result.code == null) {
-        _failConnect('Login failed: ${result.error ?? 'no code returned'}');
+        // Il dettaglio grezzo resta nei log: in faccia all'utente un codice
+        // OAuth o un messaggio interno del plugin non dice niente.
+        logError('Login Spotify rifiutato: ${result.error ?? 'nessun codice'}');
+        _failConnect('Login failed, please try again');
         return;
       }
       if (result.state != expectedState) {
@@ -262,10 +279,16 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<void> disconnect() async {
     _stopPolling();
     _spotify.clearTokens();
-    await _storage.clear();
+    final cleared = await _storage.clear();
     _resetPlaybackState();
     _status = ConnectionStatus.disconnected;
-    _authError = null;
+    // Se la credenziale e' rimasta sul dispositivo il logout non e' avvenuto:
+    // annunciarlo come riuscito significherebbe far ricomparire la sessione
+    // al riavvio senza che nessuno capisca perche'.
+    _authError = cleared
+        ? null
+        : 'Could not remove the saved login. Sign out again, otherwise the '
+              'app may sign back in on its own.';
     notifyListeners();
   }
 

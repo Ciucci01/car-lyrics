@@ -1,3 +1,5 @@
+import 'package:clock/clock.dart';
+
 class SpotifyTokens {
   final String accessToken;
   final String refreshToken;
@@ -22,11 +24,11 @@ class SpotifyTokens {
     return SpotifyTokens(
       accessToken: accessToken,
       refreshToken: refreshToken,
-      expiresAt: DateTime.now().add(Duration(seconds: expiresIn)),
+      expiresAt: clock.now().add(Duration(seconds: expiresIn)),
     );
   }
 
   bool isExpired({Duration margin = const Duration(seconds: 60)}) {
-    return DateTime.now().isAfter(expiresAt.subtract(margin));
+    return clock.now().isAfter(expiresAt.subtract(margin));
   }
 }
