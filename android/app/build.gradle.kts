@@ -1,4 +1,6 @@
+import com.android.build.api.dsl.ApplicationExtension
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -17,7 +19,10 @@ val keystoreProperties = Properties().apply {
 }
 val hasReleaseKeystore = keystorePropertiesFile.exists()
 
-android {
+// configure<ApplicationExtension> invece di android { }: da AGP 9 il DSL
+// pubblico e' ApplicationExtension, e l'accessore android risolverebbe ancora
+// sul vecchio BaseAppModuleExtension, deprecato e in uscita con AGP 10.
+configure<ApplicationExtension> {
     namespace = "com.ciuccihub.carlyrics"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
@@ -25,10 +30,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
     defaultConfig {
@@ -60,6 +61,12 @@ android {
                 signingConfigs.getByName("debug")
             }
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_11
     }
 }
 
