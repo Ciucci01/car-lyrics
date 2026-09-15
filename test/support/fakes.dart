@@ -128,16 +128,20 @@ class FakeAuthenticator extends SpotifyAuthenticator {
   }
 }
 
+/// Scadenza fissa e lontana, non `now + 1 giorno`: i test del provider girano
+/// su un orologio finto e quelli dei widget su quello vero, e una scadenza
+/// calcolata sull'ora reale li legherebbe per caso.
+final tokenExpiry = DateTime.utc(2030);
+
 /// Una sessione gia' valida nell'archivio sicuro: il provider la ritrova da
 /// solo alla costruzione e parte collegato.
 void seedTokens() {
   FlutterSecureStorage.setMockInitialValues({
-    'access_token': 'accesso',
-    'refresh_token': 'rinnovo',
-    'expiry_date': DateTime.now()
-        .add(const Duration(days: 1))
-        .millisecondsSinceEpoch
-        .toString(),
+    'spotify_tokens': jsonEncode({
+      'access': 'accesso',
+      'refresh': 'rinnovo',
+      'expiry': tokenExpiry.millisecondsSinceEpoch,
+    }),
   });
 }
 

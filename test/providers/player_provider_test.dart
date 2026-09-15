@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 
 import 'package:car_play/models/lyrics.dart';
@@ -269,10 +270,10 @@ void main() {
       expect(provider.status, ConnectionStatus.connected);
       expect(provider.authError, isNull);
       // I token appena ottenuti sono finiti nell'archivio sicuro.
-      expect(
-        await const FlutterSecureStorage().read(key: 'refresh_token'),
-        'rinnovo-nuovo',
+      final raw = await const FlutterSecureStorage().read(
+        key: 'spotify_tokens',
       );
+      expect(jsonDecode(raw!)['refresh'], 'rinnovo-nuovo');
     });
   });
 }
