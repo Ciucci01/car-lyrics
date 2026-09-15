@@ -1,5 +1,6 @@
 import 'package:car_play/providers/player_provider.dart';
 import 'package:car_play/screens/lyrics_list_view.dart';
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -17,12 +18,20 @@ void main() {
   /// Monta la lista su un provider vero: `PlayerProvider` ha il costruttore
   /// privato, quindi non e' sostituibile con una finta, e comunque cio' che
   /// si vuole vedere qui e' proprio come i due reagiscono insieme.
+  ///
+  /// Il provider si registra qui e `testLista` lo chiude in un `finally`.
+  /// `addTearDown` non va bene: gira *dopo* il controllo dei timer pendenti
+  /// di `flutter_test`, quindi arriverebbe a fallimento gia' avvenuto.
+  final creati = <PlayerProvider>[];
+
   Future<PlayerProvider> pumpLista(
     WidgetTester tester,
     FakeSpotifyApi api, {
     FakeLyricsProvider? lyrics,
   }) async {
     final provider = buildPlayerProvider(api, lyrics: lyrics);
+    creati.add(provider);
+
     await tester.pumpWidget(
       MaterialApp(
         home: ChangeNotifierProvider<PlayerProvider>.value(
@@ -31,11 +40,22 @@ void main() {
         ),
       ),
     );
-    // Ripresa della sessione, primo poll, caricamento del testo e centraggio
-    // rimandato al frame successivo.
-    for (var i = 0; i < 4; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
+
+    // Ripresa della sessione, primo poll e caricamento del testo sono una
+    // catena di future: si pompa finche' non si e' fermata, invece di
+    // contare quanti salti servono oggi.
+    for (var i = 0; i < 20; i++) {
+      if (provider.status == ConnectionStatus.connected &&
+          provider.lyricsStatus != LyricsStatus.loading) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 20));
     }
+    // Il centraggio iniziale e' rimandato al frame dopo l'aggancio, e dura
+    // 400ms: mentre scorre, ScrollablePositionedList tiene due viewport vive
+    // e ogni riga risulta presente due volte.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     return provider;
   }
 
@@ -43,7 +63,35 @@ void main() {
     return tester.widget<Text>(find.text(words)).style!;
   }
 
-  testWidgets('senza testo non disegna niente', (tester) async {
+  /// `flutter_test` finge i timer ma non l'orologio, e `estimatedProgressMs`
+  /// e' ancora + tempo trascorso: senza fissarlo, asserire su quale riga sia
+  /// evidenziata dipende da quanto e' veloce la macchina. Con un orologio
+  /// fermo il trascorso e' sempre zero e a muovere la riga resta solo il
+  /// `progress_ms` che arriva dal server.
+  void testLista(
+    String descrizione,
+    Future<void> Function(WidgetTester) corpo,
+  ) {
+    testWidgets(
+      descrizione,
+      (tester) => withClock(Clock.fixed(DateTime.utc(2026)), () async {
+        try {
+          await corpo(tester);
+        } finally {
+          // Anche quando un expect e' appena fallito: i due timer del
+          // provider seppellirebbero il fallimento vero sotto un "A Timer is
+          // still pending" e continuerebbero a interrogare la finta nei test
+          // successivi.
+          for (final provider in creati) {
+            provider.dispose();
+          }
+          creati.clear();
+        }
+      }),
+    );
+  }
+
+  testLista('senza testo non disegna niente', (tester) async {
     final provider = await pumpLista(
       tester,
       FakeSpotifyApi(),
@@ -52,12 +100,10 @@ void main() {
 
     expect(provider.lyricsStatus, LyricsStatus.unavailable);
     expect(find.byType(ScrollablePositionedList), findsNothing);
-
-    provider.dispose();
   });
 
-  testWidgets('mostra le righe fra due spaziatori', (tester) async {
-    final provider = await pumpLista(tester, FakeSpotifyApi());
+  testLista('mostra le righe fra due spaziatori', (tester) async {
+    await pumpLista(tester, FakeSpotifyApi());
 
     expect(find.text('riga uno'), findsOneWidget);
     expect(find.text('riga due'), findsOneWidget);
@@ -68,11 +114,9 @@ void main() {
       find.byType(ScrollablePositionedList),
     );
     expect(lista.itemCount, syncedLyrics.lines.length + 2);
-
-    provider.dispose();
   });
 
-  testWidgets('evidenzia solo la riga corrente', (tester) async {
+  testLista('evidenzia solo la riga corrente', (tester) async {
     final provider = await pumpLista(tester, FakeSpotifyApi());
 
     expect(provider.currentLineIndex, 0);
@@ -80,11 +124,9 @@ void main() {
     expect(styleOf(tester, 'riga uno').color, const Color(0xFF1DB954));
     expect(styleOf(tester, 'riga due').fontWeight, FontWeight.normal);
     expect(styleOf(tester, 'riga due').color, Colors.white70);
-
-    provider.dispose();
   });
 
-  testWidgets('la riga evidenziata segue la posizione', (tester) async {
+  testLista('la riga evidenziata segue la posizione', (tester) async {
     // Il secondo poll riporta la riproduzione oltre l'attacco della riga due.
     final api = FakeSpotifyApi()
       ..onPlayback = (call) =>
@@ -99,14 +141,12 @@ void main() {
     expect(provider.currentLineIndex, 1);
     expect(styleOf(tester, 'riga due').fontWeight, FontWeight.bold);
     expect(styleOf(tester, 'riga uno').fontWeight, FontWeight.normal);
-
-    provider.dispose();
   });
 
-  testWidgets('un trascinamento sgancia lo scorrimento e mostra il pulsante', (
+  testLista('un trascinamento sgancia lo scorrimento e mostra il pulsante', (
     tester,
   ) async {
-    final provider = await pumpLista(tester, FakeSpotifyApi());
+    await pumpLista(tester, FakeSpotifyApi());
     expect(find.byType(FloatingActionButton), findsNothing);
 
     await tester.drag(
@@ -116,12 +156,10 @@ void main() {
     await tester.pump();
 
     expect(find.byType(FloatingActionButton), findsOneWidget);
-
-    provider.dispose();
   });
 
-  testWidgets('il pulsante riaggancia lo scorrimento', (tester) async {
-    final provider = await pumpLista(tester, FakeSpotifyApi());
+  testLista('il pulsante riaggancia lo scorrimento', (tester) async {
+    await pumpLista(tester, FakeSpotifyApi());
 
     await tester.drag(
       find.byType(ScrollablePositionedList),
@@ -134,11 +172,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.byType(FloatingActionButton), findsNothing);
-
-    provider.dispose();
   });
 
-  testWidgets('il cambio traccia riaggancia da solo', (tester) async {
+  testLista('il cambio traccia riaggancia da solo', (tester) async {
     final api = FakeSpotifyApi()
       ..onPlayback = (call) => http.Response(
         playingBody(id: call == 1 ? 'traccia-1' : 'traccia-2'),
@@ -161,7 +197,5 @@ void main() {
 
     expect(provider.playback?.trackId, 'traccia-2');
     expect(find.byType(FloatingActionButton), findsNothing);
-
-    provider.dispose();
   });
 }
