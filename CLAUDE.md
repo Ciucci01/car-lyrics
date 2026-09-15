@@ -28,7 +28,7 @@ flutter pub get                    # after any pubspec.yaml change
 flutter run -d <device>            # android is the only supported target; see below about web
 flutter analyze                    # lint (flutter_lints + prefer_const_constructors)
 dart format lib                    # 80-column formatting
-flutter test                       # unit tests only; no widget tests
+flutter test                       # shared fakes live in test/support/fakes.dart
 flutter build apk --release        # see signing below
 dart run flutter_launcher_icons    # regenerate launcher icons from assets/icon/icon.png
 ```
