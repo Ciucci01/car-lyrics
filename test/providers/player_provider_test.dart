@@ -234,6 +234,11 @@ void main() {
         authenticator: const FakeAuthenticator(wrongState: 'stato-inventato'),
       );
       addTearDown(provider.dispose);
+      // _restoreSession() parte non atteso dal costruttore e finisce con
+      // uno stato disconnected: se atterrasse dopo connect() lo
+      // sovrascriverebbe. Oggi l'ordine di scheduling lo evita, ma nessuno
+      // lo garantisce.
+      await pumpEventQueue();
 
       await provider.connect();
 
@@ -251,6 +256,11 @@ void main() {
         authenticator: const FakeAuthenticator(cancelled: true),
       );
       addTearDown(provider.dispose);
+      // _restoreSession() parte non atteso dal costruttore e finisce con
+      // uno stato disconnected: se atterrasse dopo connect() lo
+      // sovrascriverebbe. Oggi l'ordine di scheduling lo evita, ma nessuno
+      // lo garantisce.
+      await pumpEventQueue();
 
       await provider.connect();
 
@@ -263,6 +273,11 @@ void main() {
       final api = FakeSpotifyApi();
       final provider = buildPlayerProvider(api);
       addTearDown(provider.dispose);
+      // _restoreSession() parte non atteso dal costruttore e finisce con
+      // uno stato disconnected: se atterrasse dopo connect() lo
+      // sovrascriverebbe. Oggi l'ordine di scheduling lo evita, ma nessuno
+      // lo garantisce.
+      await pumpEventQueue();
 
       await provider.connect();
 
