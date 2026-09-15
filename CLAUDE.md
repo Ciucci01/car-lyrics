@@ -135,7 +135,7 @@ State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `i
 - Never `print`: use `logInfo` / `logError` from `lib/utils/app_log.dart`.
 - Failures that a user can act on become a state (`authError`, `LyricsStatus.failed`), not just a log line.
 - A failure whose outcome is *unknown* must never overwrite known-good state with an empty one.
-- Anything that opens a route from the provider takes a `NavigatorState` resolved before the state change, not a `BuildContext` — notifying listeners unmounts the widget the context came from.
+- No provider method takes a `BuildContext`, and none of them opens a route — `connect()` used to push the login WebView and had to carry a `NavigatorState` resolved *before* the state change, because `notifyListeners()` unmounts the widget the context came from. The system browser removed the route and the hazard with it. If a route ever has to be opened from the provider again, that is the trap to remember.
 - `disconnect()` cannot clear the browser's Spotify session — that is what `show_dialog=true` on the authorize URL is for.
 - One `http.Client` is created in the factory, shared by all three services and closed in `dispose()` — not one pool per service.
 - A parsed-but-unused field is a trap, not documentation: `error` and `syncType` both sat unread until they were wired up, and both needed their default polarity chosen carefully at that point.
