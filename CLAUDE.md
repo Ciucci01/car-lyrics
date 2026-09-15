@@ -25,7 +25,7 @@ No client secret: auth uses PKCE. The Spotify app registration must whitelist th
 
 ```bash
 flutter pub get                    # after any pubspec.yaml change
-flutter run -d <device>            # android is the primary target; chrome also works
+flutter run -d <device>            # android is the only supported target; see below about web
 flutter analyze                    # lint (flutter_lints + prefer_const_constructors)
 dart format lib                    # 80-column formatting
 flutter test                       # unit tests only; no widget tests
@@ -34,6 +34,8 @@ dart run flutter_launcher_icons    # regenerate launcher icons from assets/icon/
 ```
 
 Release signing reads `android/key.properties` (gitignored: `storeFile`, `storePassword`, `keyAlias`, `keyPassword`). Without that file the release build falls back to debug keys so `flutter run --release` still works locally.
+
+**Android is the only supported target.** `web/` builds and boots, but login cannot complete there — the PKCE flow returns to a `car-play://` custom scheme, which a browser tab has no way to hand back. Making web work would need an `http` redirect URI, a callback page served by the web app, and that URI added to the Spotify app registration; none of that exists. Since nothing in the app works without a session, a web build is a blank login screen. `usePathUrlStrategy()` in `main()` is the only web-specific line left, and it is a no-op elsewhere. `ios/`, `macos/`, `linux/` and `windows/` are untouched template scaffolding: the iOS bundle identifier was renamed alongside Android, the desktop ones still say `com.example`.
 
 ## Architecture
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
-import 'package:url_strategy/url_strategy.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'providers/player_provider.dart';
 import 'screens/config_error_screen.dart';
@@ -20,7 +20,7 @@ Future<void> main() async {
         'SPOTIFY_CLIENT_ID.';
   }
 
-  setPathUrlStrategy();
+  usePathUrlStrategy();
   runApp(CarPlayApp(configError: configError));
 }
 
