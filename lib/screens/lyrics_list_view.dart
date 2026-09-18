@@ -3,7 +3,9 @@ import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../models/lyrics_text_size.dart';
 import '../providers/player_provider.dart';
+import '../providers/settings_provider.dart';
 
 class LyricsListView extends StatefulWidget {
   const LyricsListView({super.key});
@@ -19,9 +21,12 @@ class _LyricsListViewState extends State<LyricsListView> {
   static const double _lineAlignment = 0.25;
 
   final ItemScrollController _scrollController = ItemScrollController();
+  final ItemPositionsListener _positionsListener =
+      ItemPositionsListener.create();
   bool _autoScrollEnabled = true;
   int? _lastScrolledIndex;
   String? _lastTrackId;
+  LyricsTextSize? _lastTextSize;
   PlayerProvider? _player;
 
   @override
@@ -68,6 +73,14 @@ class _LyricsListViewState extends State<LyricsListView> {
 
   bool _scrollToLine(int lineIndex) {
     if (!_scrollController.isAttached) return false;
+    // isAttached diventa true appena la lista si registra, ma non dice che la
+    // viewport sia stata misurata. Se non lo e', scrollTo non fallisce
+    // subito: rimanda a una callback post-frame e li' esplode con
+    // "ScrollController not attached to any scroll views", fuori dalla
+    // portata di qualunque try. Le posizioni note sono il segnale che la
+    // lista ha davvero un viewport sotto.
+    if (_positionsListener.itemPositions.value.isEmpty) return false;
+
     _scrollController.scrollTo(
       // +1 per lo spaziatore in testa alla lista.
       index: (lineIndex < 0 ? 0 : lineIndex) + 1,
@@ -81,8 +94,17 @@ class _LyricsListViewState extends State<LyricsListView> {
   @override
   Widget build(BuildContext context) {
     final player = context.watch<PlayerProvider>();
+    final textSize = context.watch<SettingsProvider>().lyricsTextSize;
     final lines = player.lyrics?.lines;
     if (lines == null || lines.isEmpty) return const SizedBox.shrink();
+
+    if (_lastTextSize != textSize) {
+      _lastTextSize = textSize;
+      // Righe piu' alte o piu' basse spostano la riga corrente altrove nella
+      // lista: senza rifare il centraggio il testo scivola via da solo sotto
+      // gli occhi di chi guida. Stesso meccanismo del primo caricamento.
+      _lastScrolledIndex = null;
+    }
 
     // Il primo centraggio puo' avvenire solo a lista agganciata, cioe' dopo
     // questo frame.
@@ -103,6 +125,7 @@ class _LyricsListViewState extends State<LyricsListView> {
           child: ScrollablePositionedList.builder(
             itemCount: lines.length + 2,
             itemScrollController: _scrollController,
+            itemPositionsListener: _positionsListener,
             itemBuilder: (context, index) {
               // Gli spaziatori seguono _lineAlignment: in testa ne serve
               // quanto basta a far salire la prima riga fino a quel punto, in
@@ -126,7 +149,9 @@ class _LyricsListViewState extends State<LyricsListView> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: isCurrent ? const Color(0xFF1DB954) : Colors.white70,
-                    fontSize: isCurrent ? 20 : 16,
+                    fontSize: isCurrent
+                        ? textSize.currentLineSize
+                        : textSize.otherLineSize,
                     fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),

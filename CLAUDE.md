@@ -28,7 +28,7 @@ flutter pub get                    # after any pubspec.yaml change
 flutter run -d <device>            # android is the primary target; chrome also works
 flutter analyze                    # lint (flutter_lints + prefer_const_constructors)
 dart format lib                    # 80-column formatting
-flutter test                       # no tests exist yet; there is no test/ directory
+flutter test                       # unit + widget tests
 flutter build apk --release        # see signing below
 dart run flutter_launcher_icons    # regenerate launcher icons from assets/icon/icon.png
 ```
@@ -37,14 +37,19 @@ Release signing reads `android/key.properties` (gitignored: `storeFile`, `storeP
 
 ## Architecture
 
-One screen, no router, and a single `ChangeNotifier` holding all state.
+One screen, no router, and two `ChangeNotifier`s.
 
 ```
-main.dart ──> ChangeNotifierProvider(PlayerProvider) ──> PlayerScreen
-                                                          ├── LyricsListView   (auto-scrolling lyrics)
-                                                          └── PlayerControls   (prev / play-pause / next)
+main.dart ──> MultiProvider ──> PlayerScreen
+                ├── PlayerProvider     (everything that comes from Spotify)
+                └── SettingsProvider   (how the user wants the screen to look)
+                                                          ├── LyricsListView         (auto-scrolling lyrics)
+                                                          ├── LyricsTextSizeButton   (AppBar, text size menu)
+                                                          └── PlayerControls         (prev / play-pause / next)
                             SpotifyAuthWebView is pushed as a route during login
 ```
+
+**`PlayerProvider` holds all the state that comes from Spotify**, and that is the line between the two. `SettingsProvider` exists because a display preference has nothing to do with playback, tokens or timers, and has a persistence of its own; folding it into a class that is already several hundred lines of polling and auth would have been the only field in there that Spotify never sends. It is deliberately tiny: one preference, read once at startup, written when it changes.
 
 Services are **instances wired through `PlayerProvider`'s factory constructor** (`TokenStorage` → `SpotifyAuth` → `SpotifyService`, plus the `LyricsRepository` chain), all injectable via named parameters. Nothing is static, so a fake `http.Client` is enough to exercise any of them.
 
@@ -115,6 +120,18 @@ State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `i
 `LyricsListView` renders with `ScrollablePositionedList` and inserts a half-screen spacer at each end, so **list index = lyric index + 1**. `currentLineIndex` is `-1` before the first line starts, meaning nothing is highlighted. Scrolling is driven by a provider listener (a side effect), while highlighting comes from `context.watch` in `build`. A user drag disables auto-scroll until the recenter FAB is tapped or the track changes.
 
 `_scrollToLine` returns whether it actually scrolled, and `_lastScrolledIndex` is only recorded on success — the controller is not attached on the first frame after lyrics load, and marking that as done would strand the view at the top. A post-frame callback in `build` performs the initial centering once the list is attached.
+
+**`ItemScrollController.isAttached` is not a sufficient guard**, and finding that out the hard way is worth recording. It flips to `true` as soon as the list registers itself, which can happen before the viewport has been measured. Calling `scrollTo` in that window does not fail where you called it: the controller defers to a post-frame callback and the assertion — `ScrollController not attached to any scroll views` — fires a frame later, outside any `try` you could wrap around it. The real readiness signal is an `ItemPositionsListener` with a non-empty `itemPositions`, so `_scrollToLine` checks that too and simply returns `false` when the list is not ready yet. Nothing is lost: `_lastScrolledIndex` stays `null` and the next provider update retries.
+
+### Text size
+
+`LyricsTextSize` is an enum of four levels, each a multiplier over the two historical sizes — 20 for the current line, 16 for the rest — which are exactly the `medium` level. The multiplier form is deliberate: the ratio between the highlighted line and the ones around it is what tells a driver at a glance where the song is, and four hand-picked pairs would drift away from it.
+
+Changing the size resets `_lastScrolledIndex`, because taller or shorter lines move the current one somewhere else in the list and the text would otherwise slide out from under the reader. It reuses the same post-frame recentering path as the first load.
+
+An unrecognised stored value — an older build, or tampered preferences — reads as `medium` rather than as an error, the same polarity choice as `error` and `syncType` in the lyrics payload.
+
+`LyricsTextSizeButton` is its own widget rather than an inline `PopupMenuButton` in the `AppBar`: inside `PlayerScreen` it could only be exercised by mounting the whole screen, which drags in the title `Marquee` and the wakelock and leaves a pending timer in the test.
 
 ## Conventions
 
