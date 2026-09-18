@@ -6,6 +6,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/playback_state.dart';
 import '../providers/player_provider.dart';
 import 'lyrics_list_view.dart';
+import 'lyrics_text_size_button.dart';
 import 'player_controls.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -40,6 +41,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           },
         ),
         actions: [
+          Consumer<PlayerProvider>(
+            builder: (context, player, _) {
+              if (!player.isConnected) return const SizedBox.shrink();
+              return const LyricsTextSizeButton();
+            },
+          ),
           Consumer<PlayerProvider>(
             builder: (context, player, _) {
               if (!player.isConnected) return const SizedBox.shrink();
