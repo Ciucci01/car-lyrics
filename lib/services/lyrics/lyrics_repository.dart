@@ -22,9 +22,14 @@ class LyricsRepository {
 
   LyricsRepository({required this.providers, this.cache});
 
-  Future<Lyrics?> lyricsFor(LyricsQuery query) async {
-    final hit = await cache?.read(query.trackId);
-    if (hit != null) return hit.lyrics;
+  /// `skipCache` salta solo la *lettura*: le scritture restano quelle di
+  /// sempre, cosi' un giro chiesto a mano puo' correggere una voce vecchia
+  /// invece di limitarsi a ignorarla per una volta.
+  Future<Lyrics?> lyricsFor(LyricsQuery query, {bool skipCache = false}) async {
+    if (!skipCache) {
+      final hit = await cache?.read(query.trackId);
+      if (hit != null) return hit.lyrics;
+    }
 
     Lyrics? bestUnsynced;
     Lyrics? instrumental;

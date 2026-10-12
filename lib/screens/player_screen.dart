@@ -8,6 +8,7 @@ import '../providers/player_provider.dart';
 import 'lyrics_list_view.dart';
 import 'lyrics_text_size_button.dart';
 import 'player_controls.dart';
+import 'reload_lyrics_button.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -45,6 +46,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
             builder: (context, player, _) {
               if (!player.isConnected) return const SizedBox.shrink();
               return const LyricsTextSizeButton();
+            },
+          ),
+          Consumer<PlayerProvider>(
+            builder: (context, player, _) {
+              if (!player.isConnected) return const SizedBox.shrink();
+              return const ReloadLyricsButton();
             },
           ),
           Consumer<PlayerProvider>(

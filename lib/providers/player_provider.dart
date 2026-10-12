@@ -447,7 +447,10 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
-  Future<void> _loadLyrics(PlaybackState playback) async {
+  Future<void> _loadLyrics(
+    PlaybackState playback, {
+    bool skipCache = false,
+  }) async {
     final requestId = ++_lyricsRequestId;
 
     _lyrics = null;
@@ -464,6 +467,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
           albumName: playback.albumName,
           durationMs: playback.durationMs,
         ),
+        skipCache: skipCache,
       );
       // Risposta in ritardo di una traccia gia' cambiata: va ignorata, o
       // mostreremmo il testo della canzone precedente.
@@ -489,9 +493,15 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  /// Rifa' il giro delle fonti per la traccia in corso, saltando la cache.
+  ///
+  /// Chiedere espressamente di ricaricare e poi rispondere con la copia in
+  /// cache sarebbe un pulsante che non fa niente: proprio i casi per cui lo
+  /// si tocca — la rete e' cambiata, il testo e' quello sbagliato — sono
+  /// quelli in cui la voce salvata e' la cosa da scavalcare.
   Future<void> retryLyrics() async {
     final playback = _playback;
-    if (playback != null) await _loadLyrics(playback);
+    if (playback != null) await _loadLyrics(playback, skipCache: true);
   }
 
   Future<void> togglePlayPause() async {
