@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'providers/player_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/config_error_screen.dart';
 import 'screens/player_screen.dart';
 
@@ -66,8 +67,13 @@ class CarPlayApp extends StatelessWidget {
       );
     }
 
-    return ChangeNotifierProvider(
-      create: (_) => PlayerProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => PlayerProvider()),
+        // Separato da PlayerProvider di proposito: la' dentro tutto arriva da
+        // Spotify, qui c'e' solo come l'utente vuole vedere la schermata.
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ],
       child: MaterialApp(
         title: 'Spotify Lyrics',
         theme: theme,

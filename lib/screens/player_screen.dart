@@ -6,6 +6,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/playback_state.dart';
 import '../providers/player_provider.dart';
 import 'lyrics_list_view.dart';
+import 'lyrics_text_size_button.dart';
 import 'player_controls.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -43,6 +44,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           Consumer<PlayerProvider>(
             builder: (context, player, _) {
               if (!player.isConnected) return const SizedBox.shrink();
+              return const LyricsTextSizeButton();
+            },
+          ),
+          Consumer<PlayerProvider>(
+            builder: (context, player, _) {
+              if (!player.isConnected) return const SizedBox.shrink();
               return IconButton(
                 icon: const Icon(Icons.logout),
                 tooltip: 'Disconnect',
@@ -60,7 +67,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           if (!player.isConnected) {
             return _ConnectView(error: player.authError);
           }
-          return _PlaybackView(player: player);
+          return PlaybackView(player: player);
         },
       ),
     );
@@ -120,10 +127,14 @@ class _ConnectView extends StatelessWidget {
   }
 }
 
-class _PlaybackView extends StatelessWidget {
+/// Il testo piu' i comandi, nell'unica disposizione che l'orientamento
+/// permette. Pubblica solo perche' il passaggio fra le due disposizioni si
+/// possa verificare senza montare l'intera schermata, che si porta dietro il
+/// Marquee del titolo e il wakelock.
+class PlaybackView extends StatelessWidget {
   final PlayerProvider player;
 
-  const _PlaybackView({required this.player});
+  const PlaybackView({super.key, required this.player});
 
   @override
   Widget build(BuildContext context) {
@@ -131,6 +142,17 @@ class _PlaybackView extends StatelessWidget {
       return const _Message(
         icon: Icons.music_off,
         text: 'No song playing.\nStart playback on any Spotify device.',
+      );
+    }
+
+    // In orizzontale l'altezza e' la cosa scarsa: i comandi si spostano sul
+    // bordo destro, dove invece lo spazio avanza.
+    if (MediaQuery.of(context).orientation == Orientation.landscape) {
+      return Row(
+        children: [
+          Expanded(child: _buildLyricsArea()),
+          PlayerControls(player: player, axis: Axis.vertical),
+        ],
       );
     }
 
