@@ -200,6 +200,34 @@ void main() {
     },
   );
 
+  test('skipCache ignora la copia salvata e riconsulta le fonti', () async {
+    final cache = _FakeCache();
+    cache.storage[_query.trackId] = const CacheHit(_unsynced);
+    final provider = _FakeProvider(result: _synced);
+    final repository = LyricsRepository(providers: [provider], cache: cache);
+
+    final result = await repository.lyricsFor(_query, skipCache: true);
+
+    expect(provider.calls, 1);
+    expect(result, _synced);
+  });
+
+  test('skipCache corregge la voce in cache invece di scavalcarla', () async {
+    final cache = _FakeCache();
+    cache.storage[_query.trackId] = const CacheHit(_unsynced);
+    final repository = LyricsRepository(
+      providers: [_FakeProvider(result: _synced)],
+      cache: cache,
+    );
+
+    await repository.lyricsFor(_query, skipCache: true);
+
+    // Saltare la lettura e basta lascerebbe il pulsante da ripremere ad ogni
+    // avvio: la ricarica deve sostituire cio' che era salvato.
+    expect(cache.writeFoundCalls, [_query.trackId]);
+    expect(cache.storage[_query.trackId]?.lyrics, _synced);
+  });
+
   test('un risultato sincronizzato viene scritto in cache', () async {
     final cache = _FakeCache();
     final repository = LyricsRepository(
