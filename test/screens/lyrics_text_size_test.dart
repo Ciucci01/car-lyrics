@@ -126,13 +126,15 @@ void main() {
     });
   }
 
-  testSchermata('senza scelta rende le righe come ha sempre fatto', (
-    tester,
-  ) async {
+  testSchermata('senza scelta parte dal livello medio', (tester) async {
     await pumpSchermata(tester);
 
-    expect(sizeOf(tester, 'riga uno'), 20);
-    expect(sizeOf(tester, 'riga due'), 16);
+    // Non e' piu' la misura storica: quella ora e' `small`. Chi non tocca il
+    // menu vede il testo un gradino piu' grande di com'era, che e' il motivo
+    // per cui la scala e' stata spostata.
+    expect(sizeOf(tester, 'riga uno'), LyricsTextSize.medium.currentLineSize);
+    expect(sizeOf(tester, 'riga due'), LyricsTextSize.medium.otherLineSize);
+    expect(sizeOf(tester, 'riga uno'), greaterThan(20));
   });
 
   testSchermata('la taglia scelta arriva alle righe', (tester) async {

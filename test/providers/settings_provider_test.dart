@@ -17,9 +17,12 @@ void main() {
   }
 
   group('la scala parte dai valori storici', () {
-    test('medio lascia le righe come sono sempre state', () {
-      expect(LyricsTextSize.medium.currentLineSize, 20);
-      expect(LyricsTextSize.medium.otherLineSize, 16);
+    test('la taglia piu piccola e l app com era prima', () {
+      // La scala parte da qui e sale: in auto nessuno vuole il testo piu'
+      // piccolo di com'era, mentre in cima lo spazio mancava.
+      expect(LyricsTextSize.small.currentLineSize, 20);
+      expect(LyricsTextSize.small.otherLineSize, 16);
+      expect(LyricsTextSize.values.first, LyricsTextSize.small);
     });
 
     test('gli altri livelli mantengono la proporzione fra le due righe', () {

@@ -125,7 +125,9 @@ State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `i
 
 ### Text size
 
-`LyricsTextSize` is an enum of four levels, each a multiplier over the two historical sizes — 20 for the current line, 16 for the rest — which are exactly the `medium` level. The multiplier form is deliberate: the ratio between the highlighted line and the ones around it is what tells a driver at a glance where the song is, and four hand-picked pairs would drift away from it.
+`LyricsTextSize` is an enum of four levels, each a multiplier over the two historical sizes — 20 for the current line, 16 for the rest. The multiplier form is deliberate: the ratio between the highlighted line and the ones around it is what tells a driver at a glance where the song is, and four hand-picked pairs would drift away from it.
+
+**The scale starts at the historical size and only goes up**: `small` is 1.0, and the steps are 1.3, 1.6, 1.9. An earlier version centred the scale on the old size with a 0.8 level below it; trying it in a car showed nobody wants the lyrics *smaller* than they were, while the top of the range ran out of room. Two consequences worth knowing: the historical size is now `small`, not `medium`, and since `medium` remains the default a fresh install renders one step larger than the app used to.
 
 Changing the size resets `_lastScrolledIndex`, because taller or shorter lines move the current one somewhere else in the list and the text would otherwise slide out from under the reader. It reuses the same post-frame recentering path as the first load.
 
