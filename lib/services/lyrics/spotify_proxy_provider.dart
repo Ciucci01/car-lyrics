@@ -12,7 +12,10 @@ import 'lyrics_provider.dart';
 class SpotifyProxyProvider implements LyricsProvider {
   static const _timeout = Duration(seconds: 5);
 
-  final String baseUrl;
+  /// Risolto ad ogni richiesta, non una volta sola alla costruzione:
+  /// l'indirizzo e' un'impostazione dell'app e puo' comparire, cambiare o
+  /// sparire mentre l'app e' aperta.
+  final String Function() baseUrl;
   final http.Client _client;
 
   SpotifyProxyProvider({required this.baseUrl, http.Client? client})
@@ -23,11 +26,17 @@ class SpotifyProxyProvider implements LyricsProvider {
 
   @override
   Future<Lyrics?> fetch(LyricsQuery query) async {
+    final base = baseUrl().trim();
+    // Senza indirizzo non c'e' niente da chiedere. Vale come "non ce l'ho" e
+    // non come una caduta: la catena resta completa e puo' scrivere in
+    // cache, esattamente come quando il proxy non era proprio in lista.
+    if (base.isEmpty) return null;
+
     // Uri.replace normalizza lo slash tra host e query string e fa
     // l'URL-encoding del trackId: l'interpolazione diretta rompeva entrambe
-    // le cose se LYRICS_BASE_URL aveva uno slash finale.
+    // le cose se l'indirizzo impostato aveva uno slash finale.
     final uri = Uri.parse(
-      baseUrl,
+      base,
     ).replace(queryParameters: {'trackid': query.trackId});
     final response = await _client.get(uri).timeout(_timeout);
 

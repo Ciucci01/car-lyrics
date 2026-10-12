@@ -14,10 +14,9 @@ UI strings and user-facing error messages are in English; code comments are in I
 
 ```
 SPOTIFY_CLIENT_ID=...
-LYRICS_BASE_URL=...      # optional: Spotify-lyrics proxy, queried as $LYRICS_BASE_URL/?trackid=<spotifyTrackId>
 ```
 
-`LYRICS_BASE_URL` is optional: leaving it empty (or unset) simply drops the Spotify proxy out of the lyrics provider chain described below, and LRCLIB serves lyrics on its own.
+That is the only key. The optional Spotify-lyrics proxy is **not** configured here: its address is a setting typed inside the app, under the overflow menu. It used to be a `LYRICS_BASE_URL` entry in this file, and moving it out is deliberate — an instance of `spotify-lyrics-api` is something each person hosts themselves, so baking one address into the bundle would ship somebody's private server inside everybody's APK and would make changing it a rebuild.
 
 No client secret: auth uses PKCE. The Spotify app registration must whitelist the redirect URI `car-play://callback`.
 
@@ -47,6 +46,8 @@ main.dart ──> MultiProvider ──> PlayerScreen
                 └── SettingsProvider   (how the user wants the screen to look)
                                                           ├── LyricsListView         (auto-scrolling lyrics)
                                                           ├── LyricsTextSizeButton   (AppBar, text size menu)
+                                                          ├── ReloadLyricsButton     (AppBar, refetch ignoring cache)
+                                                          ├── PlayerMenuButton       (AppBar, lyrics source + disconnect)
                                                           └── PlayerControls         (prev / play-pause / next)
                             SpotifyAuthenticator opens the system browser during login
 ```
@@ -125,7 +126,7 @@ A `429` throws with `retryAfter` populated from the header, and `_noteFailure` p
 
 ### Lyrics
 
-`LyricsRepository` replaced the old single-endpoint `LyricsService`: it holds an ordered list of `LyricsProvider`s and asks them in turn. The chain is `SpotifyProxyProvider` (only added when `LYRICS_BASE_URL` is set) followed by `LrclibProvider`, which always runs. The rule is "first synced source wins": the first provider to return a synced result short-circuits the search; an unsynced result is kept as a fallback and only returned once the whole chain has run without finding anything better; an instrumental result is a fallback of last resort, weaker than an unsynced one.
+`LyricsRepository` replaced the old single-endpoint `LyricsService`: it holds an ordered list of `LyricsProvider`s and asks them in turn. The chain is `SpotifyProxyProvider` followed by `LrclibProvider`, and both are always in it. The proxy resolves its base address through a `String Function()` on every request, rather than taking a `String` once at construction, because that address is a setting the user can type, change or clear while the app is running; an empty address makes it return `null` — "I don't have it" — so the chain stays complete and the cache can still be written, exactly as when the provider was left out of the list entirely. The rule is "first synced source wins": the first provider to return a synced result short-circuits the search; an unsynced result is kept as a fallback and only returned once the whole chain has run without finding anything better; an instrumental result is a fallback of last resort, weaker than an unsynced one.
 
 Each provider follows the same outcome contract as `SpotifyService`: returning `null` means "I don't have it" (legitimately no lyrics), while throwing means "I don't know" (network error, timeout, malformed response). `LyricsRepository.lyricsFor` mirrors that at the chain level, but only for the *return value*: it returns `null` when the chain finishes without a usable result, and throws `LyricsProviderException` only when every source failed outright. A provider that throws does not stop the chain; only if *all* of them throw does the repository give up. That distinction reaches `PlayerProvider._loadLyrics` unchanged: `null` becomes `LyricsStatus.unavailable`, a thrown exception becomes `LyricsStatus.failed` (the only state with a Retry button), and an instrumental result becomes `LyricsStatus.instrumental`.
 
@@ -148,6 +149,14 @@ State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `i
 **`ItemScrollController.isAttached` is not a sufficient guard**, and finding that out the hard way is worth recording. It flips to `true` as soon as the list registers itself, which can happen before the viewport has been measured. Calling `scrollTo` in that window does not fail where you called it: the controller defers to a post-frame callback and the assertion — `ScrollController not attached to any scroll views` — fires a frame later, outside any `try` you could wrap around it. The real readiness signal is an `ItemPositionsListener` with a non-empty `itemPositions`, so `_scrollToLine` checks that too and simply returns `false` when the list is not ready yet. Nothing is lost: `_lastScrolledIndex` stays `null` and the next provider update retries.
 
 `ReloadLyricsButton` in the `AppBar` redoes the chain for the current track with `skipCache: true`, and it is the only way out of a wrong-but-present result. The cache read is what makes it necessary: a positive entry never expires, so a track resolved while a preferred source was unreachable — the proxy behind a VPN that was off, say — would keep serving the worse answer forever, and the screen offers nothing to press because its status is `ready`, not `failed`. `skipCache` skips only the *read*; the writes are unchanged, so a reload corrects the stored entry instead of bypassing it once per launch. `retryLyrics()` always skips the cache: answering an explicit reload from the cache would be a button that does nothing.
+
+### Lyrics source
+
+The proxy address lives in `SettingsProvider` next to the text size, and `main.dart` is what joins the two halves: `_CarPlayAppState` owns the one `SettingsProvider` and hands `PlayerProvider` a `() => settings.lyricsProxyUrl` closure. The dependency runs one way and only through that closure — `PlayerProvider` never learns that `SettingsProvider` exists, which is what keeps the line in Architecture honest.
+
+`LyricsSourceDialog` validates before saving: empty is valid and means "no proxy", anything else has to be an absolute `http`/`https` URL with an authority. Without that check a typo would surface a song later as lyrics that refuse to load, which reads as a broken app rather than a wrong setting.
+
+`PlayerMenuButton` exists because the `AppBar` ran out of room at three icons, and because Disconnect next to the reload button is a logout by accident at a traffic light. Everything that is not needed while driving goes under the three dots.
 
 ### Text size
 

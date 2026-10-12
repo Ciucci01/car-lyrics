@@ -26,8 +26,7 @@ Future<void> main() async {
 }
 
 String? _describeMissingConfig() {
-  // LYRICS_BASE_URL e' facoltativa: senza il proxy Spotify la catena usa
-  // solo LRCLIB.
+  // L'unica chiave che serve: la fonte dei testi si imposta dentro l'app.
   final missing = [
     'SPOTIFY_CLIENT_ID',
   ].where((key) => (dotenv.env[key] ?? '').isEmpty).toList();
@@ -35,10 +34,26 @@ String? _describeMissingConfig() {
   return 'Missing keys in .env: ${missing.join(', ')}.';
 }
 
-class CarPlayApp extends StatelessWidget {
+class CarPlayApp extends StatefulWidget {
   final String? configError;
 
   const CarPlayApp({super.key, this.configError});
+
+  @override
+  State<CarPlayApp> createState() => _CarPlayAppState();
+}
+
+class _CarPlayAppState extends State<CarPlayApp> {
+  /// Tenuto qui, e non creato dentro `build`, perche' `PlayerProvider` lo
+  /// interroga ad ogni richiesta di testo per sapere dove sta il proxy: deve
+  /// essere lo stesso oggetto per tutta la vita dell'app.
+  final SettingsProvider _settings = SettingsProvider();
+
+  @override
+  void dispose() {
+    _settings.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,20 +74,25 @@ class CarPlayApp extends StatelessWidget {
       visualDensity: VisualDensity.adaptivePlatformDensity,
     );
 
+    final configError = widget.configError;
     if (configError != null) {
       return MaterialApp(
         title: 'Spotify Lyrics',
         theme: theme,
-        home: ConfigErrorScreen(message: configError!),
+        home: ConfigErrorScreen(message: configError),
       );
     }
 
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => PlayerProvider()),
         // Separato da PlayerProvider di proposito: la' dentro tutto arriva da
         // Spotify, qui c'e' solo come l'utente vuole vedere la schermata.
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider.value(value: _settings),
+        ChangeNotifierProvider(
+          create: (_) => PlayerProvider(
+            lyricsProxyBaseUrl: () => _settings.lyricsProxyUrl,
+          ),
+        ),
       ],
       child: MaterialApp(
         title: 'Spotify Lyrics',

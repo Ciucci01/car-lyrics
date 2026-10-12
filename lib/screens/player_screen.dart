@@ -8,6 +8,7 @@ import '../providers/player_provider.dart';
 import 'lyrics_list_view.dart';
 import 'lyrics_text_size_button.dart';
 import 'player_controls.dart';
+import 'player_menu_button.dart';
 import 'reload_lyrics_button.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -57,11 +58,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           Consumer<PlayerProvider>(
             builder: (context, player, _) {
               if (!player.isConnected) return const SizedBox.shrink();
-              return IconButton(
-                icon: const Icon(Icons.logout),
-                tooltip: 'Disconnect',
-                onPressed: player.disconnect,
-              );
+              return const PlayerMenuButton();
             },
           ),
         ],
