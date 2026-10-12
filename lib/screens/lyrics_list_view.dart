@@ -98,6 +98,9 @@ class _LyricsListViewState extends State<LyricsListView> {
     final lines = player.lyrics?.lines;
     if (lines == null || lines.isEmpty) return const SizedBox.shrink();
 
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
     if (_lastTextSize != textSize) {
       _lastTextSize = textSize;
       // Righe piu' alte o piu' basse spostano la riga corrente altrove nella
@@ -162,7 +165,12 @@ class _LyricsListViewState extends State<LyricsListView> {
         if (!_autoScrollEnabled)
           Positioned(
             bottom: 20,
-            right: 20,
+            // In orizzontale i comandi occupano il bordo destro: lasciato in
+            // basso a destra il pulsante ci finirebbe appiccicato, e due
+            // bersagli adiacenti che fanno cose diverse sono un errore di
+            // tocco in macchina.
+            left: isLandscape ? 20 : null,
+            right: isLandscape ? null : 20,
             child: FloatingActionButton(
               tooltip: 'Follow the lyrics again',
               onPressed: () {

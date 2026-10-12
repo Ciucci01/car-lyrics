@@ -135,6 +135,16 @@ An unrecognised stored value — an older build, or tampered preferences — rea
 
 `LyricsTextSizeButton` is its own widget rather than an inline `PopupMenuButton` in the `AppBar`: inside `PlayerScreen` it could only be exercised by mounting the whole screen, which drags in the title `Marquee` and the wakelock and leaves a pending timer in the test.
 
+### Landscape
+
+`PlaybackView` lays the same two pieces out along whichever axis has room to spare. In portrait the controls are a bar at the bottom; in landscape they become a column on the right edge, at the same icon sizes.
+
+The reason is that the two orientations run out of different things. The bar costs about 90pt of **height**, which in landscape is exactly the dimension the lyrics need and the one there is least of — four or five lines instead of six or seven. Width, in landscape, is what is left over, and a column of transport buttons costs around 10% of it.
+
+Two consequences are deliberate. The buttons are grouped at the vertical centre rather than spread over the full height, so a driver reaches all three without moving their hand. And `LyricsListView` moves its recenter FAB to the bottom *left* in landscape: left where it was, it would sit flush against the transport column, and two adjacent targets that do unrelated things is a mis-tap waiting to happen in a car.
+
+`PlaybackView` is public for the same reason `LyricsTextSizeButton` is: the orientation switch can only be exercised by mounting it directly, since mounting `PlayerScreen` drags in the title `Marquee` and the wakelock.
+
 ## Conventions
 
 - Never `print`: use `logInfo` / `logError` from `lib/utils/app_log.dart`.
