@@ -25,15 +25,17 @@ No client secret: auth uses PKCE. The Spotify app registration must whitelist th
 
 ```bash
 flutter pub get                    # after any pubspec.yaml change
-flutter run -d <device>            # android is the primary target; chrome also works
+flutter run -d <device>            # android is the only supported target; see below about web
 flutter analyze                    # lint (flutter_lints + prefer_const_constructors)
 dart format lib                    # 80-column formatting
-flutter test                       # no tests exist yet; there is no test/ directory
+flutter test                       # shared fakes live in test/support/fakes.dart
 flutter build apk --release        # see signing below
 dart run flutter_launcher_icons    # regenerate launcher icons from assets/icon/icon.png
 ```
 
 Release signing reads `android/key.properties` (gitignored: `storeFile`, `storePassword`, `keyAlias`, `keyPassword`). Without that file the release build falls back to debug keys so `flutter run --release` still works locally.
+
+**Android is the only supported target.** `web/` builds and boots, but login cannot complete there — the PKCE flow returns to a `car-play://` custom scheme, which a browser tab has no way to hand back. Making web work would need an `http` redirect URI, a callback page served by the web app, and that URI added to the Spotify app registration; none of that exists. Since nothing in the app works without a session, a web build is a blank login screen. `usePathUrlStrategy()` in `main()` is the only web-specific line left, and it is a no-op elsewhere. `ios/`, `macos/`, `linux/` and `windows/` are untouched template scaffolding: the iOS bundle identifier was renamed alongside Android, the desktop ones still say `com.example`.
 
 ## Architecture
 
@@ -43,12 +45,14 @@ One screen, no router, and a single `ChangeNotifier` holding all state.
 main.dart ──> ChangeNotifierProvider(PlayerProvider) ──> PlayerScreen
                                                           ├── LyricsListView   (auto-scrolling lyrics)
                                                           └── PlayerControls   (prev / play-pause / next)
-                            SpotifyAuthWebView is pushed as a route during login
+                            SpotifyAuthenticator opens the system browser during login
 ```
 
-Services are **instances wired through `PlayerProvider`'s factory constructor** (`TokenStorage` → `SpotifyAuth` → `SpotifyService`, plus the `LyricsRepository` chain), all injectable via named parameters. Nothing is static, so a fake `http.Client` is enough to exercise any of them.
+Services are **instances wired through `PlayerProvider`'s factory constructor** (`TokenStorage` → `SpotifyAuth` → `SpotifyService`, plus `SpotifyAuthenticator` and the `LyricsRepository` chain), all injectable via named parameters. Nothing is static, so a fake `http.Client` is enough to exercise any of them.
 
 ### Two timers, two different jobs
+
+**`PlayerProvider` never calls `DateTime.now()`** — every reading of the current instant goes through `clock.now()` from `package:clock`. In production the two are the same thing. In tests they are not: `fake_async` hands the provider a clock it controls, so twelve seconds of polling and a hundred and twenty ticks resolve instantly and deterministically. Reintroducing a bare `DateTime.now()` here does not fail the build — it quietly makes that code path untestable, because half of what this class does is arithmetic on elapsed time.
 
 This is the core of the design and the thing to understand before touching playback:
 
@@ -71,9 +75,19 @@ Optimistic UI: `togglePlayPause` re-anchors from the current estimate and notifi
 
 `SpotifyAuth` implements the authorization-code flow with PKCE — no client secret anywhere, since anything in the bundle is extractable from the APK. Each login generates a random verifier, sends its SHA-256 challenge, and validates the returned `state`.
 
-The flow never leaves the app: `SpotifyAuthWebView` loads the authorize URL and intercepts `car-play://callback` in its `NavigationDelegate`, so the custom scheme is **not** registered in the manifest. The route pops with a `SpotifyAuthResult`, so backing out simply yields `null` — there is no completer that can hang, and a main-frame load error pops with an error instead of leaving a blank page.
+The authorize URL opens in the **system browser**, per RFC 8252: `SpotifyAuthenticator` is a thin wrapper over `flutter_web_auth_2`, which uses Chrome Auth Tab on Android and `ASWebAuthenticationSession` on iOS. The user therefore types their password into a view the app does not control, and the federated "Continue with Google/Apple" buttons work — inside an embedded WebView they are often blocked, which locked out anyone whose account was created that way. This replaced the old in-app `SpotifyAuthWebView`.
 
-**Known trade-off:** RFC 8252 says native apps should use the system browser, not an embedded WebView. This app has always used a WebView, and two consequences are worth knowing before shipping widely: the user types their password into a view the app controls, and federated "Continue with Google/Apple" buttons are often blocked inside embedded WebViews — so accounts created that way may be unable to log in at all. Moving to `flutter_web_auth_2` (Custom Tabs / `ASWebAuthenticationSession`) would keep the same never-hangs property. Untested on device.
+Because the callback arrives from outside the app, the custom scheme **is** registered: `com.linusu.flutter_web_auth_2.CallbackActivity` is declared in `AndroidManifest.xml` with an intent filter for `car-play`. iOS needs nothing in `Info.plist` — `ASWebAuthenticationSession` matches the scheme itself.
+
+`authenticate()` returns `null` when the user backs out — the plugin signals that as a `PlatformException` with code `CANCELED`, and cancelling is not an error worth showing. Any other `PlatformException` becomes a `SpotifyAuthResult` carrying its message, so the caller's flow is unchanged. That `'CANCELED'` is a magic string shared with a third-party plugin, so `spotify_authenticator_test.dart` pins it by substituting `FlutterWebAuth2Platform.instance` — the same seam `token_storage_test.dart` uses for the Keystore. If the constant ever moves upstream, a test says so instead of every cancellation silently turning into an error on screen.
+
+**There are two ways to give up, and both must read as giving up.** Backing out of the browser is one; pressing Cancel on Spotify's own consent screen is the other, and it comes back as a redirect carrying `error=access_denied`. `show_dialog=true` puts that screen in front of *every* explicit login, so what used to be a rare path is now one tap away each time — `connect()` therefore treats `access_denied` exactly like `null`. Every other `error` is a real failure: the raw value goes to the log and the user gets a sentence, never an OAuth code or a plugin-internal string.
+
+`connect()` returns immediately if the status is already `connecting`. The button is gone by then — `PlayerScreen` checks `isBusy` before it renders `_ConnectView` — but only from the next frame, and the plugin keeps a single callback per scheme: a second `authenticate()` inside that window overwrites the first without completing it, leaving that `connect()` awaiting forever.
+
+**The authorize URL always carries `show_dialog=true`,** and that is not decoration. The system browser keeps its own Spotify cookies, which `disconnect()` cannot reach: without the flag the authorize page would approve itself and hand back the same account, making logout a no-op for anyone trying to switch. The cost is one extra confirmation tap, and only on an explicit login — reopening the app still resumes from the stored refresh token.
+
+**Verified on a real Android device** (October 2026, release build signed with debug keys): the browser opens, the callback returns into the app, the federated buttons work, and logout followed by login lets a different account in. Login on **web** does not work and did not before: the flow would need an `http` redirect URI and a callback page.
 
 Token lifecycle in `SpotifyService._send()`:
 1. **proactive** — refresh if the stored expiry is within 60s;
@@ -81,7 +95,17 @@ Token lifecycle in `SpotifyService._send()`:
 3. refreshes are deduplicated through `_pendingRefresh`, because Spotify rotates the refresh token on every exchange and parallel refreshes would invalidate each other;
 4. a definitive refresh failure clears storage and fires `onAuthLost`, which drops the provider back to `disconnected`.
 
-**Known trade-off:** `TokenStorage` keeps the Spotify refresh token in plain `SharedPreferences`, not `flutter_secure_storage`. On a non-rooted device that is covered by normal app sandboxing, so this is a deliberate, currently-undecided trade-off rather than an oversight — not a gap nobody noticed. If it needs to change, the move is `flutter_secure_storage` plus a migration step for installs that already have a token in `SharedPreferences`.
+`TokenStorage` keeps all three values — access token, refresh token, expiry — in `flutter_secure_storage`, which wraps its key in the Android Keystore. They travel as **one JSON blob under one key**, and that is the whole point rather than a convenience: three separate writes can have two succeed, leaving a fresh access token beside a stale refresh token and a stale expiry. That mixed triple is indistinguishable from a good one on read, and it leads straight to refreshing with a token Spotify has already rotated. One key makes the invariant true by construction. Biometric options are deliberately not used; an app meant to start with the phone already in its cradle should not put a fingerprint in front of launch.
+
+Earlier installs kept those values in plain `SharedPreferences`. `load()` therefore falls back to reading them from there, writes them into secure storage, and empties the old keys **only once that write is confirmed**. The order is the point: clearing first would mean that on a device where the Keystore reads but refuses to write, both copies are gone at once — the session survives until the app closes and then the user logs in again on every launch, forever, with nothing but a log line to show for it. A failed write leaves the cleartext where it is so the next launch can retry. A *partial* leftover is dropped rather than migrated, and those keys are cleared regardless: an incomplete set is unusable, and leaving it would keep a token in cleartext forever.
+
+**As shipped, no user reaches that migration.** The same release renames `applicationId`, and Android scopes `SharedPreferences` to the package name, so the renamed build installs with an empty data directory. The code is kept as insurance for a later upgrade, once the package name stops moving — not because anyone is migrating today. Note also that the *probe* is not once-per-install: while no session is stored, every cold start opens `SharedPreferences` and removes the three legacy keys. That is cheap, but it is not nothing.
+
+**Failures are reported, not hidden — but only where the caller can act on them.** The Keystore really can become unreadable: a restore from backup, a wipe of the device credentials.
+
+- A **read** that throws is logged and becomes `null`, so the user signs in again instead of meeting a crash. It deliberately does *not* fall back to `SharedPreferences`, which would undo the point, and it deletes nothing — the data is already unreadable, and the next successful `save()` overwrites it anyway.
+- A **write** that throws is logged and `save()` returns `false`. The session does not die: the tokens are valid in memory and an otherwise-working session should not end because it could not be persisted. The boolean exists for the migration, which must not discard the cleartext copy until it knows the encrypted one landed.
+- A **delete** that throws makes `clear()` return `false`, and `disconnect()` must not paper over that. A logout that could not remove the credential has not happened: announce it as successful and the session quietly returns on the next launch, with nobody able to explain why. `clear()` also wipes the legacy `SharedPreferences` keys in a `try` of its own — emptying the old cleartext store is exactly the thing that must not depend on the health of the new one.
 
 ### Errors: "nothing playing" vs "don't know"
 
@@ -121,8 +145,9 @@ State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `i
 - Never `print`: use `logInfo` / `logError` from `lib/utils/app_log.dart`.
 - Failures that a user can act on become a state (`authError`, `LyricsStatus.failed`), not just a log line.
 - A failure whose outcome is *unknown* must never overwrite known-good state with an empty one.
-- Anything that opens a route from the provider takes a `NavigatorState` resolved before the state change, not a `BuildContext` — notifying listeners unmounts the widget the context came from.
-- `disconnect()` also clears the WebView cookies, otherwise the next login silently re-enters the same account.
+- No provider method takes a `BuildContext`, and none of them opens a route — `connect()` used to push the login WebView and had to carry a `NavigatorState` resolved *before* the state change, because `notifyListeners()` unmounts the widget the context came from. The system browser removed the route and the hazard with it. If a route ever has to be opened from the provider again, that is the trap to remember.
+- `disconnect()` cannot clear the browser's Spotify session — that is what `show_dialog=true` on the authorize URL is for.
 - One `http.Client` is created in the factory, shared by all three services and closed in `dispose()` — not one pool per service.
+- A widget test that builds a real `PlayerProvider` must dispose it in a `finally` **inside the test body**. `addTearDown` looks like the right tool and is not: it runs *after* `flutter_test` checks for pending timers, so the poll and tick timers trip that check first and bury the real failure under "A Timer is still pending".
 - A parsed-but-unused field is a trap, not documentation: `error` and `syncType` both sat unread until they were wired up, and both needed their default polarity chosen carefully at that point.
-- `applicationId` is still `com.example.car_play`.
+- The published identity is `com.ciuccihub.carlyrics`, labelled "Car Lyrics" — Android, iOS and web. The Flutter package is still named `car_play`, and so are the logger name and the LRCLIB `User-Agent`: those are internal and nothing outside reads them. macOS, Linux and Windows are not targets and still carry `com.example`.

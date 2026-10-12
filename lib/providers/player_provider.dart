@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -7,13 +8,13 @@ import 'package:http/http.dart' as http;
 import '../models/lyrics.dart';
 import '../models/playback_state.dart';
 import '../models/spotify_tokens.dart';
-import '../screens/spotify_auth_webview.dart';
 import '../services/auth_service.dart';
 import '../services/lyrics/lrclib_provider.dart';
 import '../services/lyrics/lyrics_cache.dart';
 import '../services/lyrics/lyrics_provider.dart';
 import '../services/lyrics/lyrics_repository.dart';
 import '../services/lyrics/spotify_proxy_provider.dart';
+import '../services/spotify_authenticator.dart';
 import '../services/spotify_service.dart';
 import '../services/storage_service.dart';
 import '../utils/app_log.dart';
@@ -30,6 +31,11 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   static const _commandSettleDelay = Duration(milliseconds: 400);
 
   static const redirectUri = 'car-play://callback';
+
+  /// Quello che Spotify mette nel redirect quando l'utente preme Cancel
+  /// sulla schermata di conferma.
+  static const _userDeniedError = 'access_denied';
+
   static const _scopes = [
     'user-read-playback-state',
     'user-modify-playback-state',
@@ -38,6 +44,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
 
   final TokenStorage _storage;
   final SpotifyAuth _auth;
+  final SpotifyAuthenticator _authenticator;
   final SpotifyService _spotify;
   final LyricsRepository _lyricsRepository;
   final http.Client _httpClient;
@@ -66,6 +73,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   factory PlayerProvider({
     TokenStorage? storage,
     SpotifyAuth? auth,
+    SpotifyAuthenticator? authenticator,
     SpotifyService? spotify,
     LyricsRepository? lyricsRepository,
   }) {
@@ -87,6 +95,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     return PlayerProvider._(
       storage: resolvedStorage,
       auth: resolvedAuth,
+      authenticator: authenticator ?? const SpotifyAuthenticator(),
       spotify:
           spotify ??
           SpotifyService(
@@ -103,11 +112,13 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   PlayerProvider._({
     required TokenStorage storage,
     required SpotifyAuth auth,
+    required SpotifyAuthenticator authenticator,
     required SpotifyService spotify,
     required LyricsRepository lyricsRepository,
     required http.Client httpClient,
   }) : _storage = storage,
        _auth = auth,
+       _authenticator = authenticator,
        _spotify = spotify,
        _lyricsRepository = lyricsRepository,
        _httpClient = httpClient {
@@ -149,7 +160,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
 
     var value = _anchorProgressMs;
     if (_anchorIsPlaying) {
-      value += DateTime.now().difference(anchorAt).inMilliseconds;
+      value += clock.now().difference(anchorAt).inMilliseconds;
     }
 
     final duration = _playback?.durationMs ?? 0;
@@ -171,16 +182,18 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> connect(BuildContext context) async {
+  Future<void> connect() async {
     if (!_auth.isConfigured) {
       _authError = 'SPOTIFY_CLIENT_ID is missing from .env';
       notifyListeners();
       return;
     }
-
-    // Il navigator va risolto adesso: la notifica qui sotto smonta il widget
-    // da cui arriva questo context, e con esso la sua validita'.
-    final navigator = Navigator.of(context);
+    // Il pulsante sparisce appena lo stato passa a connecting, ma fra la
+    // notifica e il ridisegno passa un frame. Due tocchi dentro quella
+    // finestra lascerebbero la prima authenticate() appesa per sempre: il
+    // plugin tiene una sola callback per schema e la seconda sovrascrive la
+    // prima senza completarla.
+    if (_status == ConnectionStatus.connecting) return;
 
     _status = ConnectionStatus.connecting;
     _authError = null;
@@ -189,8 +202,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     try {
       final verifier = SpotifyAuth.createCodeVerifier();
       final expectedState = SpotifyAuth.createState();
-      final result = await SpotifyAuthWebView.show(
-        navigator,
+      final result = await _authenticator.authenticate(
         authorizeUrl: _auth.authorizeUrl(
           redirectUri: redirectUri,
           scopes: _scopes,
@@ -200,14 +212,20 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
         redirectUri: redirectUri,
       );
 
-      if (result == null) {
-        // Login annullato: nessun errore da mostrare.
+      if (result == null || result.error == _userDeniedError) {
+        // Uscire dal browser e negare il consenso sono la stessa rinuncia.
+        // Con show_dialog=true la schermata di conferma, col suo Cancel, sta
+        // davanti a ogni login esplicito: e' un percorso comune, non un caso
+        // limite, e non va mostrato come un errore.
         _status = ConnectionStatus.disconnected;
         notifyListeners();
         return;
       }
       if (result.error != null || result.code == null) {
-        _failConnect('Login failed: ${result.error ?? 'no code returned'}');
+        // Il dettaglio grezzo resta nei log: in faccia all'utente un codice
+        // OAuth o un messaggio interno del plugin non dice niente.
+        logError('Login Spotify rifiutato: ${result.error ?? 'nessun codice'}');
+        _failConnect('Login failed, please try again');
         return;
       }
       if (result.state != expectedState) {
@@ -261,11 +279,16 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<void> disconnect() async {
     _stopPolling();
     _spotify.clearTokens();
-    await _storage.clear();
-    await SpotifyAuthWebView.clearSession();
+    final cleared = await _storage.clear();
     _resetPlaybackState();
     _status = ConnectionStatus.disconnected;
-    _authError = null;
+    // Se la credenziale e' rimasta sul dispositivo il logout non e' avvenuto:
+    // annunciarlo come riuscito significherebbe far ricomparire la sessione
+    // al riavvio senza che nessuno capisca perche'.
+    _authError = cleared
+        ? null
+        : 'Could not remove the saved login. Sign out again, otherwise the '
+              'app may sign back in on its own.';
     notifyListeners();
   }
 
@@ -304,7 +327,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     // allunga la finestra di blocco invece di accorciarla.
     final blockedUntil = _pollBlockedUntil;
     if (blockedUntil != null) {
-      if (DateTime.now().isBefore(blockedUntil)) return;
+      if (clock.now().isBefore(blockedUntil)) return;
       _pollBlockedUntil = null;
     }
 
@@ -338,7 +361,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   /// Registra un errore e, se Spotify ha imposto un'attesa, la rispetta.
   void _noteFailure(String what, Object error, StackTrace stackTrace) {
     if (error is SpotifyApiException && error.retryAfter != null) {
-      _pollBlockedUntil = DateTime.now().add(error.retryAfter!);
+      _pollBlockedUntil = clock.now().add(error.retryAfter!);
       logInfo('Polling sospeso per ${error.retryAfter!.inSeconds}s');
     }
     logError(what, error, stackTrace);
@@ -393,7 +416,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   void _setAnchor(int progressMs, bool isPlaying) {
     _anchorProgressMs = progressMs;
     _anchorIsPlaying = isPlaying;
-    _anchorAt = DateTime.now();
+    _anchorAt = clock.now();
   }
 
   void _tick() {
@@ -502,7 +525,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<void> _runCommand(String what, Future<void> Function() command) async {
     final blockedUntil = _pollBlockedUntil;
     final backoffActive =
-        blockedUntil != null && DateTime.now().isBefore(blockedUntil);
+        blockedUntil != null && clock.now().isBefore(blockedUntil);
     if (backoffActive) {
       // Il backoff vale anche qui: un comando che continua a bussare durante
       // un 429 allunga la finestra di blocco tanto quanto un poll periodico.

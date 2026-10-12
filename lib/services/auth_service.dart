@@ -60,6 +60,10 @@ class SpotifyAuth {
         'state': state,
         'code_challenge_method': 'S256',
         'code_challenge': codeChallenge,
+        // Il browser di sistema conserva i cookie di Spotify anche dopo il
+        // nostro logout: senza questo la pagina approverebbe da sola e
+        // rientreremmo sempre nello stesso account.
+        'show_dialog': 'true',
       },
     );
   }
@@ -86,6 +90,17 @@ class SpotifyAuth {
     }, previousRefreshToken: refreshToken);
   }
 
+  /// Il solo campo `error` della risposta, o il tipo di corpo se manca.
+  static String _errorCodeOf(String body) {
+    try {
+      final json = jsonDecode(body);
+      if (json is Map && json['error'] != null) return '${json['error']}';
+    } catch (_) {
+      // Corpo non JSON: non c'e' niente da estrarre, e non va stampato.
+    }
+    return 'risposta non riconosciuta';
+  }
+
   Future<SpotifyTokens?> _postToken(
     Map<String, String> body, {
     String? previousRefreshToken,
@@ -100,8 +115,12 @@ class SpotifyAuth {
           .timeout(_requestTimeout);
 
       if (response.statusCode != 200) {
+        // Solo il codice di errore, non il corpo: e' l'unico endpoint
+        // dell'app che maneggia segreti, e cosa ci finisce dentro lo decide
+        // Spotify, non noi.
         logError(
-          'Richiesta token fallita: ${response.statusCode} ${response.body}',
+          'Richiesta token fallita: ${response.statusCode} '
+          '${_errorCodeOf(response.body)}',
         );
         return null;
       }
