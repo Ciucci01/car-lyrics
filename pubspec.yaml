@@ -1,7 +1,7 @@
 name: car_play
 description: "Testi Spotify sincronizzati, a schermo intero, pensati per l'uso in auto."
 publish_to: "none"
-version: 0.1.0
+version: 1.0.0+1
 
 environment:
   sdk: ^3.9.0
