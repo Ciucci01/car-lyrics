@@ -106,7 +106,7 @@ class _ConnectView extends StatelessWidget {
             ],
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () => context.read<PlayerProvider>().connect(context),
+              onPressed: () => context.read<PlayerProvider>().connect(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1DB954),
                 foregroundColor: Colors.white,
