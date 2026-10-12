@@ -1,4 +1,5 @@
 import 'package:car_play/providers/player_provider.dart';
+import 'package:car_play/providers/settings_provider.dart';
 import 'package:car_play/screens/lyrics_list_view.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/fakes.dart';
 
@@ -13,6 +15,7 @@ void main() {
   setUp(() {
     loadTestEnv();
     seedTokens();
+    SharedPreferences.setMockInitialValues({});
   });
 
   /// Monta la lista su un provider vero: `PlayerProvider` ha il costruttore
@@ -34,8 +37,13 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: ChangeNotifierProvider<PlayerProvider>.value(
-          value: provider,
+        home: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<PlayerProvider>.value(value: provider),
+            ChangeNotifierProvider<SettingsProvider>(
+              create: (_) => SettingsProvider(),
+            ),
+          ],
           child: const Scaffold(body: LyricsListView()),
         ),
       ),
