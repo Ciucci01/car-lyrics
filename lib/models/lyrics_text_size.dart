@@ -4,11 +4,15 @@
 /// 16 per le altre — invece di elencare quattro coppie di numeri scelte a
 /// mano. Cosi' il rapporto fra riga attiva e righe attorno, che e' quello che
 /// rende leggibile il punto in cui si e', resta lo stesso a ogni livello.
+///
+/// La scala parte dalle misure storiche e sale: provata in auto, la vecchia
+/// taglia piu' piccola (0.8) non serviva a nessuno, mentre in cima mancava
+/// spazio. Quindi `small` e' l'app com'era, e tutto il resto e' piu' grande.
 enum LyricsTextSize {
-  small('Small', 0.8),
-  medium('Medium', 1),
-  large('Large', 1.3),
-  huge('Extra large', 1.6);
+  small('Small', 1),
+  medium('Medium', 1.3),
+  large('Large', 1.6),
+  huge('Extra large', 1.9);
 
   const LyricsTextSize(this.label, this.scale);
 
