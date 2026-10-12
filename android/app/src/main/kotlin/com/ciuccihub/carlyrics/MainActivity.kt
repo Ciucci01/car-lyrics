@@ -1,4 +1,4 @@
-package com.example.car_play
+package com.ciuccihub.carlyrics
 
 import io.flutter.embedding.android.FlutterActivity
 
