@@ -1,6 +1,6 @@
 {
-    "name": "car_play",
-    "short_name": "car_play",
+    "name": "Car Lyrics",
+    "short_name": "Car Lyrics",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

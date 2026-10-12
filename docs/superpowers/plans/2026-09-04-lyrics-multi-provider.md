@@ -49,7 +49,7 @@ Rispetto alla spec il parser LRC sta in un file suo invece che dentro l'adattato
 - Consumes: `LyricLine` da `lib/models/lyrics.dart` (esistente).
 - Produces: `List<LyricLine> parseLrc(String body)` — righe ordinate per tempo crescente; lista vuota se il corpo non contiene timestamp.
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 ```dart
 // test/services/lyrics/lrc_parser_test.dart
@@ -92,12 +92,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run: `flutter test test/services/lyrics/lrc_parser_test.dart`
 Expected: FAIL — `Error: Couldn't resolve the package 'car_play' ... lrc_parser.dart` (il file non esiste ancora).
 
-- [ ] **Step 3: Scrivere l'implementazione minima**
+- [x] **Step 3: Scrivere l'implementazione minima**
 
 ```dart
 // lib/services/lyrics/lrc_parser.dart
@@ -148,12 +148,12 @@ int _millisecondsOf(RegExpMatch match) {
 }
 ```
 
-- [ ] **Step 4: Eseguire i test e verificare che passino**
+- [x] **Step 4: Eseguire i test e verificare che passino**
 
 Run: `flutter test test/services/lyrics/lrc_parser_test.dart`
 Expected: PASS, 5 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/services/lyrics/lrc_parser.dart test/services/lyrics/lrc_parser_test.dart
@@ -174,7 +174,7 @@ git commit -m "[feat] Parser del formato LRC"
 
 `instrumental` serve perche' LRCLIB distingue "brano strumentale" da "testo non trovato", e senza un campo dedicato quell'informazione si perderebbe nel `null` del contratto `Future<Lyrics?>`. `toJson` serve alla cache della task 6.
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 ```dart
 // test/models/lyrics_test.dart
@@ -221,12 +221,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run: `flutter test test/models/lyrics_test.dart`
 Expected: FAIL — `No named parameter with the name 'instrumental'` e `The method 'toJson' isn't defined`.
 
-- [ ] **Step 3: Modificare `lib/models/lyrics.dart`**
+- [x] **Step 3: Modificare `lib/models/lyrics.dart`**
 
 Aggiungere il campo al costruttore e alla classe, leggerlo in `fromJson`, e aggiungere `toJson`:
 
@@ -277,7 +277,7 @@ class Lyrics {
 
 Il resto della classe (`isUsable`, `isSynced`) resta invariato.
 
-- [ ] **Step 4: Modificare `lib/models/playback_state.dart`**
+- [x] **Step 4: Modificare `lib/models/playback_state.dart`**
 
 Aggiungere due campi. Nel costruttore, fra `artistName` e `albumImageUrl`:
 
@@ -306,12 +306,12 @@ Renderli `required` nel costruttore e in `copyWith` (che li ripropaga invariati)
 
 Sostituire l'accesso esistente a `item['album']?['images']` con `album?['images']` per non leggerlo due volte.
 
-- [ ] **Step 5: Eseguire i test e l'analisi**
+- [x] **Step 5: Eseguire i test e l'analisi**
 
 Run: `flutter test test/models/lyrics_test.dart && flutter analyze`
 Expected: 3 test PASS; analyze pulito.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/models test/models
@@ -331,7 +331,7 @@ git commit -m "[feat] Flag strumentale, serializzazione e metadati per la ricerc
 
 Questa task non ha test propri: e' sola dichiarazione, e viene esercitata dalle task 4, 5 e 7.
 
-- [ ] **Step 1: Creare il file**
+- [x] **Step 1: Creare il file**
 
 ```dart
 // lib/services/lyrics/lyrics_provider.dart
@@ -379,12 +379,12 @@ class LyricsProviderException implements Exception {
 }
 ```
 
-- [ ] **Step 2: Verificare che compili**
+- [x] **Step 2: Verificare che compili**
 
 Run: `flutter analyze lib/services/lyrics/lyrics_provider.dart`
 Expected: `No issues found`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add lib/services/lyrics/lyrics_provider.dart
@@ -403,7 +403,7 @@ git commit -m "[feat] Contratto comune delle fonti di testi"
 - Consumes: `LyricsProvider`, `LyricsQuery`, `LyricsProviderException` (task 3); `Lyrics` (task 2).
 - Produces: `SpotifyProxyProvider({required String baseUrl, http.Client? client})`, con `name == 'spotify-proxy'`.
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 ```dart
 // test/services/lyrics/spotify_proxy_provider_test.dart
@@ -468,12 +468,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run: `flutter test test/services/lyrics/spotify_proxy_provider_test.dart`
 Expected: FAIL — il file `spotify_proxy_provider.dart` non esiste.
 
-- [ ] **Step 3: Scrivere l'implementazione**
+- [x] **Step 3: Scrivere l'implementazione**
 
 ```dart
 // lib/services/lyrics/spotify_proxy_provider.dart
@@ -519,12 +519,12 @@ class SpotifyProxyProvider implements LyricsProvider {
 }
 ```
 
-- [ ] **Step 4: Eseguire i test e verificare che passino**
+- [x] **Step 4: Eseguire i test e verificare che passino**
 
 Run: `flutter test test/services/lyrics/spotify_proxy_provider_test.dart`
 Expected: PASS, 3 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/services/lyrics/spotify_proxy_provider.dart test/services/lyrics/spotify_proxy_provider_test.dart
@@ -543,7 +543,7 @@ git commit -m "[feat] Adattatore per il proxy dei testi di Spotify"
 - Consumes: `parseLrc` (task 1); `LyricsProvider`, `LyricsQuery`, `LyricsProviderException` (task 3); `Lyrics`, `LyricLine` (task 2).
 - Produces: `LrclibProvider({http.Client? client, String host = 'lrclib.net'})`, con `name == 'lrclib'`.
 
-- [ ] **Step 1: Confermare il comportamento in assenza di corrispondenza**
+- [x] **Step 1: Confermare il comportamento in assenza di corrispondenza**
 
 Run:
 ```bash
@@ -552,7 +552,7 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 ```
 Expected: `404`. La regola resta quella della spec a prescindere — 404 o corpo senza testi produce `null`, ogni altro non-2xx solleva — quindi se il codice fosse 200 con corpo vuoto non cambia nulla dell'implementazione qui sotto, che copre entrambi i rami.
 
-- [ ] **Step 2: Scrivere il test che fallisce**
+- [x] **Step 2: Scrivere il test che fallisce**
 
 ```dart
 // test/services/lyrics/lrclib_provider_test.dart
@@ -650,12 +650,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 3: Eseguire il test e verificare che fallisca**
+- [x] **Step 3: Eseguire il test e verificare che fallisca**
 
 Run: `flutter test test/services/lyrics/lrclib_provider_test.dart`
 Expected: FAIL — il file `lrclib_provider.dart` non esiste.
 
-- [ ] **Step 4: Scrivere l'implementazione**
+- [x] **Step 4: Scrivere l'implementazione**
 
 ```dart
 // lib/services/lyrics/lrclib_provider.dart
@@ -741,12 +741,12 @@ class LrclibProvider implements LyricsProvider {
 }
 ```
 
-- [ ] **Step 5: Eseguire i test e verificare che passino**
+- [x] **Step 5: Eseguire i test e verificare che passino**
 
 Run: `flutter test test/services/lyrics/lrclib_provider_test.dart`
 Expected: PASS, 5 test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/services/lyrics/lrclib_provider.dart test/services/lyrics/lrclib_provider_test.dart
@@ -766,7 +766,7 @@ git commit -m "[feat] Adattatore LRCLIB con ripiego sul testo non sincronizzato"
 - Consumes: `Lyrics` con `toJson`/`fromJson` (task 2).
 - Produces: `LyricsCache(Directory directory)`; `static Future<LyricsCache> open()`; `Future<CacheHit?> read(String trackId)`; `Future<void> writeFound(String trackId, Lyrics lyrics)`; `Future<void> writeMissing(String trackId)`. `class CacheHit { final Lyrics? lyrics; }` — `null` come ritorno di `read` significa "non so", un `CacheHit` con `lyrics` nullo significa "nessuna fonte ce l'ha, e la risposta e' ancora fresca".
 
-- [ ] **Step 1: Aggiungere la dipendenza**
+- [x] **Step 1: Aggiungere la dipendenza**
 
 In `pubspec.yaml`, fra `shared_preferences` e `scrollable_positioned_list`:
 
@@ -777,7 +777,7 @@ In `pubspec.yaml`, fra `shared_preferences` e `scrollable_positioned_list`:
 Run: `flutter pub get`
 Expected: risoluzione senza conflitti.
 
-- [ ] **Step 2: Scrivere il test che fallisce**
+- [x] **Step 2: Scrivere il test che fallisce**
 
 ```dart
 // test/services/lyrics/lyrics_cache_test.dart
@@ -858,12 +858,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 3: Eseguire il test e verificare che fallisca**
+- [x] **Step 3: Eseguire il test e verificare che fallisca**
 
 Run: `flutter test test/services/lyrics/lyrics_cache_test.dart`
 Expected: FAIL — il file `lyrics_cache.dart` non esiste.
 
-- [ ] **Step 4: Scrivere l'implementazione**
+- [x] **Step 4: Scrivere l'implementazione**
 
 ```dart
 // lib/services/lyrics/lyrics_cache.dart
@@ -977,12 +977,12 @@ class LyricsCache {
 }
 ```
 
-- [ ] **Step 5: Eseguire i test e verificare che passino**
+- [x] **Step 5: Eseguire i test e verificare che passino**
 
 Run: `flutter test test/services/lyrics/lyrics_cache_test.dart`
 Expected: PASS, 5 test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/services/lyrics/lyrics_cache.dart test/services/lyrics/lyrics_cache_test.dart pubspec.yaml pubspec.lock
@@ -1001,7 +1001,7 @@ git commit -m "[feat] Cache su file dei testi con sfratto e scadenza dei negativ
 - Consumes: `LyricsProvider`, `LyricsQuery`, `LyricsProviderException` (task 3); `LyricsCache`, `CacheHit` (task 6).
 - Produces: `LyricsRepository({required List<LyricsProvider> providers, LyricsCache? cache})`; `Future<Lyrics?> lyricsFor(LyricsQuery query)` — solleva `LyricsProviderException` se ogni provider ha sollevato.
 
-- [ ] **Step 1: Scrivere il test che fallisce**
+- [x] **Step 1: Scrivere il test che fallisce**
 
 ```dart
 // test/services/lyrics/lyrics_repository_test.dart
@@ -1120,12 +1120,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Eseguire il test e verificare che fallisca**
+- [x] **Step 2: Eseguire il test e verificare che fallisca**
 
 Run: `flutter test test/services/lyrics/lyrics_repository_test.dart`
 Expected: FAIL — il file `lyrics_repository.dart` non esiste.
 
-- [ ] **Step 3: Scrivere l'implementazione**
+- [x] **Step 3: Scrivere l'implementazione**
 
 ```dart
 // lib/services/lyrics/lyrics_repository.dart
@@ -1191,12 +1191,12 @@ class LyricsRepository {
 }
 ```
 
-- [ ] **Step 4: Eseguire i test e verificare che passino**
+- [x] **Step 4: Eseguire i test e verificare che passino**
 
 Run: `flutter test test/services/lyrics/lyrics_repository_test.dart`
 Expected: PASS, 6 test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/services/lyrics/lyrics_repository.dart test/services/lyrics/lyrics_repository_test.dart
@@ -1218,7 +1218,7 @@ git commit -m "[feat] Repository che ordina le fonti e preferisce il sincronizza
 - Consumes: `LyricsRepository`, `LyricsQuery`, `LyricsProviderException`, `LyricsCache`, `SpotifyProxyProvider`, `LrclibProvider` (task 3-7); `PlaybackState.primaryArtist` e `albumName` (task 2).
 - Produces: `LyricsStatus.instrumental`.
 
-- [ ] **Step 1: Sostituire il servizio nel provider**
+- [x] **Step 1: Sostituire il servizio nel provider**
 
 In `lib/providers/player_provider.dart`:
 
@@ -1266,7 +1266,7 @@ che richiede di rendere `cache` un campo non-`final` in `LyricsRepository` (`Lyr
 
 Serve anche l'import di `package:flutter_dotenv/flutter_dotenv.dart` nel provider.
 
-- [ ] **Step 2: Aggiornare `_loadLyrics`**
+- [x] **Step 2: Aggiornare `_loadLyrics`**
 
 Sostituire la firma e il corpo:
 
@@ -1314,7 +1314,7 @@ Sostituire la firma e il corpo:
 
 Aggiornare i due chiamanti: in `_applyPlayback` `unawaited(_loadLyrics(playback));` e in `retryLyrics` `if (playback != null) await _loadLyrics(playback);` (con `final playback = _playback;`).
 
-- [ ] **Step 3: Aggiungere il caso in interfaccia**
+- [x] **Step 3: Aggiungere il caso in interfaccia**
 
 In `lib/screens/player_screen.dart`, dentro `_buildLyricsArea`, aggiungere un ramo allo switch:
 
@@ -1325,7 +1325,7 @@ In `lib/screens/player_screen.dart`, dentro `_buildLyricsArea`, aggiungere un ra
       ),
 ```
 
-- [ ] **Step 4: Rendere `LYRICS_BASE_URL` facoltativo**
+- [x] **Step 4: Rendere `LYRICS_BASE_URL` facoltativo**
 
 In `lib/main.dart`, in `_describeMissingConfig`, sostituire la lista con:
 
@@ -1333,29 +1333,29 @@ In `lib/main.dart`, in `_describeMissingConfig`, sostituire la lista con:
   final missing = ['SPOTIFY_CLIENT_ID']
 ```
 
-- [ ] **Step 5: Eliminare il servizio vecchio**
+- [x] **Step 5: Eliminare il servizio vecchio**
 
 ```bash
 git rm lib/services/lyrics_service.dart
 ```
 
-- [ ] **Step 6: Verificare che tutto stia in piedi**
+- [x] **Step 6: Verificare che tutto stia in piedi**
 
 Run: `flutter analyze && flutter test && dart format --set-exit-if-changed lib test`
 Expected: analyze pulito, tutti i test verdi, nessun file da riformattare.
 
-- [ ] **Step 7: Aggiornare CLAUDE.md**
+- [x] **Step 7: Aggiornare CLAUDE.md**
 
 Nella sezione `### Lyrics`, sostituire il paragrafo che descrive `LyricsService` con la descrizione della catena: ordine dei provider, contratto `null` contro eccezione, regola del "primo sincronizzato vince", cache su file con tetto 200 e negativi a 7 giorni, e il fatto che `LYRICS_BASE_URL` sia ora facoltativo. Aggiornare anche la sezione `## Setup`, dove quella chiave e' descritta come necessaria.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A lib test CLAUDE.md
 git commit -m "[feat] Innesta la catena multi-provider al posto del servizio unico"
 ```
 
-- [ ] **Step 9: Verifica manuale sul dispositivo**
+- [x] **Step 9: Verifica manuale sul dispositivo**
 
 Con `.env` presente e un brano in riproduzione su Spotify:
 
