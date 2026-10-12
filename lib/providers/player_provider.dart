@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/lyrics.dart';
@@ -76,6 +75,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     SpotifyAuthenticator? authenticator,
     SpotifyService? spotify,
     LyricsRepository? lyricsRepository,
+    String Function()? lyricsProxyBaseUrl,
   }) {
     // Un solo client per tutta l'app: tre client sono tre pool di
     // connessioni separati per lo stesso identico traffico.
@@ -83,12 +83,14 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     final resolvedStorage = storage ?? TokenStorage();
     final resolvedAuth = auth ?? SpotifyAuth(client: httpClient);
 
-    final proxyBaseUrl = dotenv.env['LYRICS_BASE_URL'] ?? '';
     final providers = <LyricsProvider>[
-      // Il proxy Spotify entra in catena solo se configurato: il giorno che
-      // smette di esistere basta togliere la voce dal .env.
-      if (proxyBaseUrl.isNotEmpty)
-        SpotifyProxyProvider(baseUrl: proxyBaseUrl, client: httpClient),
+      // Sempre in catena, anche senza indirizzo: si tira indietro da solo.
+      // Prima era condizionato al .env, ma l'indirizzo ora e' una
+      // impostazione, e puo' comparire mentre l'app e' gia' aperta.
+      SpotifyProxyProvider(
+        baseUrl: lyricsProxyBaseUrl ?? () => '',
+        client: httpClient,
+      ),
       LrclibProvider(client: httpClient),
     ];
 

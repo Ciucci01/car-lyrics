@@ -13,10 +13,45 @@ const _query = LyricsQuery(
 );
 
 void main() {
+  test('senza indirizzo non manda niente e vale come "non ce l\'ho"', () async {
+    var chiamate = 0;
+    final provider = SpotifyProxyProvider(
+      baseUrl: () => '   ',
+      client: MockClient((request) async {
+        chiamate++;
+        return http.Response('', 200);
+      }),
+    );
+
+    // null e non un'eccezione: senza indirizzo la catena resta completa e
+    // puo' scrivere in cache, come quando il proxy non era proprio in lista.
+    expect(await provider.fetch(_query), isNull);
+    expect(chiamate, 0);
+  });
+
+  test('un indirizzo che compare dopo viene usato subito', () async {
+    var base = '';
+    final provider = SpotifyProxyProvider(
+      baseUrl: () => base,
+      client: MockClient(
+        (request) async => http.Response(
+          '{"error":false,"syncType":"LINE_SYNCED",'
+          '"lines":[{"startTimeMs":"0","words":"Uno","endTimeMs":"0"}]}',
+          200,
+        ),
+      ),
+    );
+    expect(await provider.fetch(_query), isNull);
+
+    base = 'https://proxy.example';
+
+    expect((await provider.fetch(_query))?.lines.single.words, 'Uno');
+  });
+
   test('interroga per trackId e converte la risposta', () async {
     late Uri requested;
     final provider = SpotifyProxyProvider(
-      baseUrl: 'https://proxy.example',
+      baseUrl: () => 'https://proxy.example',
       client: MockClient((request) async {
         requested = request.url;
         return http.Response(
@@ -36,7 +71,7 @@ void main() {
 
   test('restituisce null quando la fonte dichiara di non averlo', () async {
     final provider = SpotifyProxyProvider(
-      baseUrl: 'https://proxy.example',
+      baseUrl: () => 'https://proxy.example',
       client: MockClient(
         (_) async => http.Response('{"error":true,"lines":[]}', 200),
       ),
@@ -47,7 +82,7 @@ void main() {
 
   test('restituisce null su 404 della fonte', () async {
     final provider = SpotifyProxyProvider(
-      baseUrl: 'https://proxy.example',
+      baseUrl: () => 'https://proxy.example',
       client: MockClient((_) async => http.Response('', 404)),
     );
 
@@ -56,7 +91,7 @@ void main() {
 
   test('solleva su errore del server', () async {
     final provider = SpotifyProxyProvider(
-      baseUrl: 'https://proxy.example',
+      baseUrl: () => 'https://proxy.example',
       client: MockClient((_) async => http.Response('boom', 500)),
     );
 

@@ -75,4 +75,54 @@ void main() {
       expect((await ripristinato()).lyricsTextSize, LyricsTextSize.medium);
     });
   });
+
+  group('la fonte dei testi', () {
+    test('parte vuota, cioe senza proxy', () async {
+      expect((await ripristinato()).lyricsProxyUrl, '');
+    });
+
+    test('si rilegge all avvio successivo, senza spazi intorno', () async {
+      await (await ripristinato()).setLyricsProxyUrl(
+        '  https://lyrics.example.com  ',
+      );
+
+      expect(
+        (await ripristinato()).lyricsProxyUrl,
+        'https://lyrics.example.com',
+      );
+    });
+
+    test('svuotarla torna alla sola LRCLIB', () async {
+      final settings = await ripristinato();
+      await settings.setLyricsProxyUrl('https://lyrics.example.com');
+
+      await settings.setLyricsProxyUrl('');
+
+      expect(settings.lyricsProxyUrl, '');
+      expect((await ripristinato()).lyricsProxyUrl, '');
+    });
+
+    test('avvisa chi ascolta solo quando cambia davvero', () async {
+      final settings = await ripristinato();
+      var avvisi = 0;
+      settings.addListener(() => avvisi++);
+
+      await settings.setLyricsProxyUrl('https://lyrics.example.com');
+      expect(avvisi, 1);
+
+      // Lo stesso indirizzo con spazi intorno e' lo stesso indirizzo.
+      await settings.setLyricsProxyUrl(' https://lyrics.example.com ');
+      expect(avvisi, 1);
+    });
+
+    test('le due preferenze non si cancellano a vicenda', () async {
+      final settings = await ripristinato();
+      await settings.setLyricsProxyUrl('https://lyrics.example.com');
+      await settings.setLyricsTextSize(LyricsTextSize.huge);
+
+      final riletto = await ripristinato();
+      expect(riletto.lyricsProxyUrl, 'https://lyrics.example.com');
+      expect(riletto.lyricsTextSize, LyricsTextSize.huge);
+    });
+  });
 }
