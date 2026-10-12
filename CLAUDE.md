@@ -87,7 +87,7 @@ Because the callback arrives from outside the app, the custom scheme **is** regi
 
 **The authorize URL always carries `show_dialog=true`,** and that is not decoration. The system browser keeps its own Spotify cookies, which `disconnect()` cannot reach: without the flag the authorize page would approve itself and hand back the same account, making logout a no-op for anyone trying to switch. The cost is one extra confirmation tap, and only on an explicit login — reopening the app still resumes from the stored refresh token.
 
-**Untested on device**, including whether the federated buttons actually work. Login on **web** does not work and did not before: the flow would need an `http` redirect URI and a callback page.
+**Verified on a real Android device** (October 2026, release build signed with debug keys): the browser opens, the callback returns into the app, the federated buttons work, and logout followed by login lets a different account in. Login on **web** does not work and did not before: the flow would need an `http` redirect URI and a callback page.
 
 Token lifecycle in `SpotifyService._send()`:
 1. **proactive** — refresh if the stored expiry is within 60s;
