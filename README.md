@@ -14,6 +14,16 @@ Android only. Flutter 3.47, Dart 3.9.
 - Pulls lyrics from an optional self-hosted [spotify-lyrics-api](https://github.com/akashrchandran/spotify-lyrics-api) instance first, then [LRCLIB](https://lrclib.net), and caches what it resolves.
 - Keeps the screen awake while in the foreground, and stops polling entirely when backgrounded.
 
+## What it looks like
+
+| Following the song | Text size | Lyrics source |
+| --- | --- | --- |
+| ![The current line highlighted, kept in the top quarter of the screen](docs/screenshots/lyrics.jpg) | ![The four text sizes in the AppBar menu](docs/screenshots/text-size.jpg) | ![The dialog for the optional proxy address](docs/screenshots/lyrics-source.jpg) |
+
+In landscape the transport controls move to the right edge, leaving the full height to the lyrics:
+
+![Landscape, with the transport controls in a column on the right edge](docs/screenshots/landscape.jpg)
+
 ## Running it
 
 You need your own Spotify app registration — the client ID is not in this repo, and it could not usefully be: see the note below.
