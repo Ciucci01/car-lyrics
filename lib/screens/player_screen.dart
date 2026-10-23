@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:marquee/marquee.dart';
 import 'package:provider/provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -10,6 +9,7 @@ import 'lyrics_text_size_button.dart';
 import 'player_controls.dart';
 import 'player_menu_button.dart';
 import 'reload_lyrics_button.dart';
+import 'track_title.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -252,7 +252,13 @@ class _TrackHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(height: 22, child: _buildTitle()),
+              SizedBox(
+                height: 22,
+                child: TrackTitle(
+                  text: playback.trackName,
+                  trackId: playback.trackId,
+                ),
+              ),
               Text(
                 playback.artistName,
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
@@ -263,34 +269,6 @@ class _TrackHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildTitle() {
-    const style = TextStyle(
-      color: Colors.white,
-      fontSize: 16,
-      fontWeight: FontWeight.bold,
-    );
-
-    // Marquee non accetta testo vuoto.
-    if (playback.trackName.isEmpty) {
-      return const Text('', style: style);
-    }
-
-    return Marquee(
-      key: ValueKey(playback.trackId),
-      text: playback.trackName,
-      style: style,
-      scrollAxis: Axis.horizontal,
-      blankSpace: 50,
-      velocity: 30,
-      pauseAfterRound: const Duration(seconds: 2),
-      startPadding: 0,
-      accelerationDuration: const Duration(seconds: 1),
-      accelerationCurve: Curves.linear,
-      decelerationDuration: const Duration(milliseconds: 500),
-      decelerationCurve: Curves.easeOut,
     );
   }
 }
