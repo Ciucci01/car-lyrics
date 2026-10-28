@@ -16,9 +16,7 @@ Android only. Flutter 3.47, Dart 3.9.
 
 ## What it looks like
 
-[![Watch the tour](docs/screenshots/video-poster.jpg)](https://github.com/Ciucci01/car-lyrics/releases/download/v1.1.1/car-lyrics-1.1.1.mp4)
-
-*A short tour — click to download and play.*
+https://github.com/user-attachments/assets/e340b827-6a50-462a-812a-c3b378c6d138
 
 | Following the song | Text size | Lyrics source |
 | --- | --- | --- |
