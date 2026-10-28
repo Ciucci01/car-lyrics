@@ -156,6 +156,8 @@ The proxy address lives in `SettingsProvider` next to the text size, and `main.d
 
 `LyricsSourceDialog` validates before saving: empty is valid and means "no proxy", anything else has to be an absolute `http`/`https` URL with an authority. Without that check a typo would surface a song later as lyrics that refuse to load, which reads as a broken app rather than a wrong setting.
 
+The proxy can sit behind a reverse proxy with authentication (nginx `auth_basic`, a bearer check): the dialog offers None / Bearer token / Username and password, modelled by `ProxyAuth`, and `SpotifyProxyProvider` sends the resulting `Authorization` header through a second closure resolved per request, like the address. The credential is a secret, so unlike the address it lives in `flutter_secure_storage` under `lyrics_proxy_auth`, not in `SharedPreferences`; saving an empty address drops it. A `401` from the reverse proxy is a thrown failure, not "I don't have it", so a wrong password never writes a negative cache entry.
+
 `PlayerMenuButton` exists because the `AppBar` ran out of room at three icons, and because Disconnect next to the reload button is a logout by accident at a traffic light. Everything that is not needed while driving goes under the three dots.
 
 ### Text size

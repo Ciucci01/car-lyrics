@@ -91,6 +91,7 @@ class _CarPlayAppState extends State<CarPlayApp> {
         ChangeNotifierProvider(
           create: (_) => PlayerProvider(
             lyricsProxyBaseUrl: () => _settings.lyricsProxyUrl,
+            lyricsProxyAuthorization: () => _settings.lyricsProxyAuth.header,
           ),
         ),
       ],

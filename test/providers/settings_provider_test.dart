@@ -1,12 +1,17 @@
 import 'package:car_lyrics/models/lyrics_text_size.dart';
+import 'package:car_lyrics/models/proxy_auth.dart';
 import 'package:car_lyrics/providers/settings_provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
+  });
 
   /// Il ripristino parte non atteso dal costruttore, come in PlayerProvider:
   /// il provider deve restare sincrono per ChangeNotifierProvider.
@@ -123,6 +128,46 @@ void main() {
       final riletto = await ripristinato();
       expect(riletto.lyricsProxyUrl, 'https://lyrics.example.com');
       expect(riletto.lyricsTextSize, LyricsTextSize.huge);
+    });
+  });
+
+  group('le credenziali del proxy', () {
+    test('partono assenti', () async {
+      expect((await ripristinato()).lyricsProxyAuth.header, isNull);
+    });
+
+    test('stanno nel Keystore e non nelle preferenze in chiaro', () async {
+      await (await ripristinato()).setLyricsProxyAuth(
+        const ProxyAuth.basic('io', 'segreta'),
+      );
+
+      final riletto = (await ripristinato()).lyricsProxyAuth;
+      expect(riletto.type, ProxyAuthType.basic);
+      expect(riletto.username, 'io');
+      expect(riletto.password, 'segreta');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getKeys().any((k) => k.contains('auth')), isFalse);
+    });
+
+    test('toglierle le cancella dal Keystore', () async {
+      final settings = await ripristinato();
+      await settings.setLyricsProxyAuth(const ProxyAuth.bearer('abc'));
+
+      await settings.setLyricsProxyAuth(const ProxyAuth.none());
+
+      expect(
+        await const FlutterSecureStorage().read(key: 'lyrics_proxy_auth'),
+        isNull,
+      );
+    });
+
+    test('generano gli header come li vuole nginx', () {
+      expect(const ProxyAuth.bearer('abc').header, 'Bearer abc');
+      // "Aladdin:open sesame", l'esempio della RFC 7617.
+      expect(
+        const ProxyAuth.basic('Aladdin', 'open sesame').header,
+        'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==',
+      );
     });
   });
 }
