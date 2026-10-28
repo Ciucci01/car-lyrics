@@ -31,7 +31,7 @@ class LrclibProvider implements LyricsProvider {
     });
 
     final response = await _client
-        .get(uri, headers: {'User-Agent': 'car_play/0.1.0'})
+        .get(uri, headers: {'User-Agent': 'car_lyrics/0.1.0'})
         .timeout(_timeout);
 
     if (response.statusCode == 404) return null;

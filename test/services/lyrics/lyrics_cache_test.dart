@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:car_play/models/lyrics.dart';
-import 'package:car_play/services/lyrics/lyrics_cache.dart';
+import 'package:car_lyrics/models/lyrics.dart';
+import 'package:car_lyrics/services/lyrics/lyrics_cache.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _lyrics = Lyrics(

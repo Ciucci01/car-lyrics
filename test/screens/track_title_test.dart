@@ -1,4 +1,4 @@
-import 'package:car_play/screens/track_title.dart';
+import 'package:car_lyrics/screens/track_title.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marquee/marquee.dart';

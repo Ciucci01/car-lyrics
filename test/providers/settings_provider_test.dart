@@ -1,5 +1,5 @@
-import 'package:car_play/models/lyrics_text_size.dart';
-import 'package:car_play/providers/settings_provider.dart';
+import 'package:car_lyrics/models/lyrics_text_size.dart';
+import 'package:car_lyrics/providers/settings_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

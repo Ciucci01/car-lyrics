@@ -1,6 +1,6 @@
 // test/services/lyrics/lrclib_provider_test.dart
-import 'package:car_play/services/lyrics/lrclib_provider.dart';
-import 'package:car_play/services/lyrics/lyrics_provider.dart';
+import 'package:car_lyrics/services/lyrics/lrclib_provider.dart';
+import 'package:car_lyrics/services/lyrics/lyrics_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

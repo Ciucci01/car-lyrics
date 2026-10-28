@@ -1,4 +1,4 @@
-import 'package:car_play/services/auth_service.dart';
+import 'package:car_lyrics/services/auth_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

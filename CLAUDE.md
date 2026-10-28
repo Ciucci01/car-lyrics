@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this app is
 
-`car_play` is a Flutter app that shows **time-synced Spotify lyrics on a car-friendly full-screen display**. It does not play audio itself: it is a remote control + lyrics view over the Spotify Web API, driving whatever device is currently active on the user's Spotify Connect session. Nothing works unless something is already playing on another Spotify device.
+`car_lyrics` is a Flutter app that shows **time-synced Spotify lyrics on a car-friendly full-screen display**. It does not play audio itself: it is a remote control + lyrics view over the Spotify Web API, driving whatever device is currently active on the user's Spotify Connect session. Nothing works unless something is already playing on another Spotify device.
 
 UI strings and user-facing error messages are in English; code comments are in Italian.
 
@@ -190,4 +190,4 @@ Two consequences are deliberate. The buttons are grouped at the vertical centre 
 - One `http.Client` is created in the factory, shared by all three services and closed in `dispose()` — not one pool per service.
 - A widget test that builds a real `PlayerProvider` must dispose it in a `finally` **inside the test body**. `addTearDown` looks like the right tool and is not: it runs *after* `flutter_test` checks for pending timers, so the poll and tick timers trip that check first and bury the real failure under "A Timer is still pending".
 - A parsed-but-unused field is a trap, not documentation: `error` and `syncType` both sat unread until they were wired up, and both needed their default polarity chosen carefully at that point.
-- The published identity is `com.ciuccihub.carlyrics`, labelled "Car Lyrics" — Android, iOS and web. The Flutter package is still named `car_play`, and so are the logger name and the LRCLIB `User-Agent`: those are internal and nothing outside reads them. macOS, Linux and Windows are not targets and still carry `com.example`.
+- The published identity is `com.ciuccihub.carlyrics`, labelled "Car Lyrics" — Android, iOS and web. The Flutter package is `car_lyrics`, and so are the logger name and the LRCLIB `User-Agent`; the repository is `Ciucci01/car-lyrics`, with a hyphen, because Dart package names cannot carry one. The `User-Agent` still declares version `0.1.0`, which was never true and is left alone rather than turned into a string to remember to bump. macOS, Linux and Windows are not targets: they still carry `com.example` and the old `car_play` binary name, which is scaffolding nobody builds.
