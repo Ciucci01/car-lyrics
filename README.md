@@ -16,6 +16,10 @@ Android only. Flutter 3.47, Dart 3.9.
 
 ## What it looks like
 
+[![Watch the tour](docs/screenshots/video-poster.jpg)](https://github.com/Ciucci01/car-lyrics/releases/download/v1.1.1/car-lyrics-1.1.1.mp4)
+
+*A short tour — click to download and play.*
+
 | Following the song | Text size | Lyrics source |
 | --- | --- | --- |
 | ![The current line highlighted, kept in the top quarter of the screen](docs/screenshots/lyrics.jpg) | ![The four text sizes in the AppBar menu](docs/screenshots/text-size.jpg) | ![The dialog for the optional proxy address](docs/screenshots/lyrics-source.jpg) |
