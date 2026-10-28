@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:car_play/models/spotify_tokens.dart';
-import 'package:car_play/services/storage_service.dart';
+import 'package:car_lyrics/models/spotify_tokens.dart';
+import 'package:car_lyrics/services/storage_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';

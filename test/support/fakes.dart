@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:car_play/models/lyrics.dart';
-import 'package:car_play/providers/player_provider.dart';
-import 'package:car_play/services/auth_service.dart';
-import 'package:car_play/services/lyrics/lyrics_provider.dart';
-import 'package:car_play/services/lyrics/lyrics_repository.dart';
-import 'package:car_play/services/spotify_authenticator.dart';
-import 'package:car_play/services/spotify_service.dart';
-import 'package:car_play/services/storage_service.dart';
+import 'package:car_lyrics/models/lyrics.dart';
+import 'package:car_lyrics/providers/player_provider.dart';
+import 'package:car_lyrics/services/auth_service.dart';
+import 'package:car_lyrics/services/lyrics/lyrics_provider.dart';
+import 'package:car_lyrics/services/lyrics/lyrics_repository.dart';
+import 'package:car_lyrics/services/spotify_authenticator.dart';
+import 'package:car_lyrics/services/spotify_service.dart';
+import 'package:car_lyrics/services/storage_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;

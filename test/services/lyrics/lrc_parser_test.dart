@@ -1,4 +1,4 @@
-import 'package:car_play/services/lyrics/lrc_parser.dart';
+import 'package:car_lyrics/services/lyrics/lrc_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,4 +1,4 @@
-import 'package:car_play/models/lyrics.dart';
+import 'package:car_lyrics/models/lyrics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

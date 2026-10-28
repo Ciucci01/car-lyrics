@@ -1,4 +1,4 @@
-import 'package:car_play/services/spotify_authenticator.dart';
+import 'package:car_lyrics/services/spotify_authenticator.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_web_auth_2_platform_interface/flutter_web_auth_2_platform_interface.dart';

@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:async';
 
-import 'package:car_play/models/lyrics.dart';
-import 'package:car_play/providers/player_provider.dart';
-import 'package:car_play/services/lyrics/lyrics_provider.dart';
-import 'package:car_play/services/spotify_authenticator.dart';
+import 'package:car_lyrics/models/lyrics.dart';
+import 'package:car_lyrics/providers/player_provider.dart';
+import 'package:car_lyrics/services/lyrics/lyrics_provider.dart';
+import 'package:car_lyrics/services/spotify_authenticator.dart';
 import 'package:clock/clock.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';

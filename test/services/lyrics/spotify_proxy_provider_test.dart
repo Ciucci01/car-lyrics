@@ -1,5 +1,5 @@
-import 'package:car_play/services/lyrics/lyrics_provider.dart';
-import 'package:car_play/services/lyrics/spotify_proxy_provider.dart';
+import 'package:car_lyrics/services/lyrics/lyrics_provider.dart';
+import 'package:car_lyrics/services/lyrics/spotify_proxy_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';

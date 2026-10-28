@@ -5,18 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "car_play",
+            "name": "car_lyrics",
             "request": "launch",
             "type": "dart"
         },
         {
-            "name": "car_play (profile mode)",
+            "name": "car_lyrics (profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
         },
         {
-            "name": "car_play (release mode)",
+            "name": "car_lyrics (release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"

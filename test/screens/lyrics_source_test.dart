@@ -1,6 +1,6 @@
-import 'package:car_play/providers/player_provider.dart';
-import 'package:car_play/providers/settings_provider.dart';
-import 'package:car_play/screens/player_menu_button.dart';
+import 'package:car_lyrics/providers/player_provider.dart';
+import 'package:car_lyrics/providers/settings_provider.dart';
+import 'package:car_lyrics/screens/player_menu_button.dart';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
