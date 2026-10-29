@@ -2,10 +2,10 @@ import 'package:car_lyrics/services/auth_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final auth = SpotifyAuth(clientId: 'id-di-prova');
+  final auth = SpotifyAuth(clientId: () => 'id-di-prova');
 
   Uri buildUrl() => auth.authorizeUrl(
-    redirectUri: 'car-play://callback',
+    redirectUri: 'car-lyrics://callback',
     scopes: const ['user-read-playback-state', 'user-modify-playback-state'],
     codeChallenge: 'sfida',
     state: 'stato',
@@ -23,7 +23,7 @@ void main() {
 
     expect(params['response_type'], 'code');
     expect(params['client_id'], 'id-di-prova');
-    expect(params['redirect_uri'], 'car-play://callback');
+    expect(params['redirect_uri'], 'car-lyrics://callback');
     expect(params['code_challenge_method'], 'S256');
     expect(params['code_challenge'], 'sfida');
     expect(params['state'], 'stato');

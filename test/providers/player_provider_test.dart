@@ -18,7 +18,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
-    loadTestEnv();
     seedTokens();
   });
 

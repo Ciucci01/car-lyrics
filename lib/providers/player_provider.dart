@@ -29,7 +29,9 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
 
   static const _commandSettleDelay = Duration(milliseconds: 400);
 
-  static const redirectUri = 'car-play://callback';
+  /// Deve combaciare con lo schema dichiarato in AndroidManifest.xml e con
+  /// il redirect URI registrato nella dashboard Spotify di chi usa l'app.
+  static const redirectUri = 'car-lyrics://callback';
 
   /// Quello che Spotify mette nel redirect quando l'utente preme Cancel
   /// sulla schermata di conferma.
@@ -76,12 +78,15 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     SpotifyService? spotify,
     LyricsRepository? lyricsRepository,
     String Function()? lyricsProxyBaseUrl,
+    String Function()? spotifyClientId,
   }) {
     // Un solo client per tutta l'app: tre client sono tre pool di
     // connessioni separati per lo stesso identico traffico.
     final httpClient = http.Client();
     final resolvedStorage = storage ?? TokenStorage();
-    final resolvedAuth = auth ?? SpotifyAuth(client: httpClient);
+    final resolvedAuth =
+        auth ??
+        SpotifyAuth(clientId: spotifyClientId ?? () => '', client: httpClient);
 
     final providers = <LyricsProvider>[
       // Sempre in catena, anche senza indirizzo: si tira indietro da solo.
@@ -186,7 +191,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> connect() async {
     if (!_auth.isConfigured) {
-      _authError = 'SPOTIFY_CLIENT_ID is missing from .env';
+      _authError = 'No Spotify client ID set';
       notifyListeners();
       return;
     }

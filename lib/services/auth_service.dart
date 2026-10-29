@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/spotify_tokens.dart';
@@ -15,14 +14,16 @@ class SpotifyAuth {
   static const _verifierAlphabet =
       'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
 
-  final String clientId;
+  /// Risolto a ogni richiesta e non fissato alla costruzione, per la stessa
+  /// ragione di `SpotifyProxyProvider`: e' un'impostazione che l'utente puo'
+  /// scrivere, cambiare o cancellare mentre l'app gira.
+  final String Function() clientId;
   final http.Client _client;
 
-  SpotifyAuth({String? clientId, http.Client? client})
-    : clientId = clientId ?? dotenv.env['SPOTIFY_CLIENT_ID'] ?? '',
-      _client = client ?? http.Client();
+  SpotifyAuth({required this.clientId, http.Client? client})
+    : _client = client ?? http.Client();
 
-  bool get isConfigured => clientId.isNotEmpty;
+  bool get isConfigured => clientId().isNotEmpty;
 
   static String createCodeVerifier() {
     final random = Random.secure();
@@ -54,7 +55,7 @@ class SpotifyAuth {
     return Uri.parse(_authorizeEndpoint).replace(
       queryParameters: {
         'response_type': 'code',
-        'client_id': clientId,
+        'client_id': clientId(),
         'redirect_uri': redirectUri,
         'scope': scopes.join(' '),
         'state': state,
@@ -77,7 +78,7 @@ class SpotifyAuth {
       'grant_type': 'authorization_code',
       'code': code,
       'redirect_uri': redirectUri,
-      'client_id': clientId,
+      'client_id': clientId(),
       'code_verifier': codeVerifier,
     });
   }
@@ -86,7 +87,7 @@ class SpotifyAuth {
     return _postToken({
       'grant_type': 'refresh_token',
       'refresh_token': refreshToken,
-      'client_id': clientId,
+      'client_id': clientId(),
     }, previousRefreshToken: refreshToken);
   }
 

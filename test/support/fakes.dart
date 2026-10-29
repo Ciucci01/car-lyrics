@@ -9,7 +9,6 @@ import 'package:car_lyrics/services/lyrics/lyrics_repository.dart';
 import 'package:car_lyrics/services/spotify_authenticator.dart';
 import 'package:car_lyrics/services/spotify_service.dart';
 import 'package:car_lyrics/services/storage_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -145,17 +144,13 @@ void seedTokens() {
   });
 }
 
-void loadTestEnv() {
-  dotenv.loadFromString(envString: 'SPOTIFY_CLIENT_ID=id-di-prova');
-}
-
 PlayerProvider buildPlayerProvider(
   FakeSpotifyApi api, {
   LyricsProvider? lyrics,
   SpotifyAuthenticator? authenticator,
 }) {
   final storage = TokenStorage();
-  final auth = SpotifyAuth(clientId: 'id-di-prova', client: api.client);
+  final auth = SpotifyAuth(clientId: () => 'id-di-prova', client: api.client);
   return PlayerProvider(
     storage: storage,
     auth: auth,

@@ -25,7 +25,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- Raccoglie il redirect car-play://callback che chiude il login
+        <!-- Raccoglie il redirect car-lyrics://callback che chiude il login
              Spotify aperto nel browser di sistema. -->
         <activity
             android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
@@ -35,7 +35,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="car-play" />
+                <data android:scheme="car-lyrics" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
