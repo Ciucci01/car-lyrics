@@ -31,7 +31,7 @@ In landscape the transport controls move to the right edge, leaving the full hei
 You need your own Spotify app registration. The app asks for it on first launch and keeps it on the phone — it is not baked into the build, and no build in this repo contains one.
 
 1. Create an app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and add `car-lyrics://callback` as a redirect URI.
-2. Build and run:
+2. Install the APK from the [latest release](https://github.com/Ciucci01/car-lyrics/releases/latest), or build and run it yourself:
    ```bash
    flutter pub get
    flutter run -d <device>
@@ -50,7 +50,7 @@ Spotify app registrations start in Development Mode, which only lets accounts th
 
 The other reason is that the [Developer Terms](https://developer.spotify.com/terms) treat a client ID as a Security Code and require it to be embedded "in a secure manner not accessible by third parties". A `.env` file inside a public APK is not that — one `unzip` reads it — and whoever owns the registration stays responsible for everything done with it. Since July 2026 the Web API quota is counted per developer account rather than per app, so a leaked ID drains the budget of everything that account owns.
 
-That is why the client ID is typed into the app instead of compiled into it, and why there is no APK attached to the releases here.
+That is why the client ID is typed into the app instead of compiled into it. It is also what makes a prebuilt APK safe to publish: the one attached to each release from 1.2.0 on contains no client ID, so it works with your registration and nobody else's.
 
 A Spotify **Premium** account is also required: the Web API refuses playback commands for free accounts. The lyrics still show.
 
