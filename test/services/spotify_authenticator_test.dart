@@ -40,27 +40,27 @@ void main() {
     FlutterWebAuth2Platform.instance = finta;
     return const SpotifyAuthenticator().authenticate(
       authorizeUrl: authorizeUrl,
-      redirectUri: 'car-play://callback',
+      redirectUri: 'car-lyrics://callback',
     );
   }
 
   test(
     'ricava lo schema dal redirect e passa l url di autorizzazione',
     () async {
-      final finta = _FakeWebAuth(() async => 'car-play://callback?code=xyz');
+      final finta = _FakeWebAuth(() async => 'car-lyrics://callback?code=xyz');
 
       await autentica(finta);
 
       // Lo schema arriva dal redirectUri, non da una seconda costante che puo'
       // andare fuori sincrono con quella del manifest.
-      expect(finta.schemaRicevuto, 'car-play');
+      expect(finta.schemaRicevuto, 'car-lyrics');
       expect(finta.urlRicevuto, authorizeUrl.toString());
     },
   );
 
   test('estrae code e state dal redirect', () async {
     final result = await autentica(
-      _FakeWebAuth(() async => 'car-play://callback?code=xyz&state=stato'),
+      _FakeWebAuth(() async => 'car-lyrics://callback?code=xyz&state=stato'),
     );
 
     expect(result?.code, 'xyz');
@@ -70,7 +70,7 @@ void main() {
 
   test('riporta l errore che Spotify mette nel redirect', () async {
     final result = await autentica(
-      _FakeWebAuth(() async => 'car-play://callback?error=access_denied'),
+      _FakeWebAuth(() async => 'car-lyrics://callback?error=access_denied'),
     );
 
     expect(result?.error, 'access_denied');

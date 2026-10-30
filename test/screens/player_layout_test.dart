@@ -17,7 +17,6 @@ void main() {
   const verticale = Size(400, 800);
 
   setUp(() {
-    loadTestEnv();
     seedTokens();
     SharedPreferences.setMockInitialValues({});
   });

@@ -4,8 +4,9 @@ import 'package:provider/provider.dart';
 import '../providers/player_provider.dart';
 import '../providers/settings_provider.dart';
 import 'lyrics_source_dialog.dart';
+import 'spotify_setup_screen.dart';
 
-enum _VoceMenu { lyricsSource, disconnect }
+enum _VoceMenu { lyricsSource, clientId, disconnect }
 
 /// Le azioni che non servono mentre si guida.
 ///
@@ -33,6 +34,24 @@ class PlayerMenuButton extends StatelessWidget {
                 child: const LyricsSourceDialog(),
               ),
             );
+          case _VoceMenu.clientId:
+            // Come il dialogo sopra: la schermata vive appesa al Navigator,
+            // quindi i due provider se li porta dietro.
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => MultiProvider(
+                  providers: [
+                    ChangeNotifierProvider.value(
+                      value: context.read<SettingsProvider>(),
+                    ),
+                    ChangeNotifierProvider.value(
+                      value: context.read<PlayerProvider>(),
+                    ),
+                  ],
+                  child: const SpotifySetupScreen(canGoBack: true),
+                ),
+              ),
+            );
           case _VoceMenu.disconnect:
             context.read<PlayerProvider>().disconnect();
         }
@@ -43,6 +62,14 @@ class PlayerMenuButton extends StatelessWidget {
           child: ListTile(
             leading: Icon(Icons.travel_explore),
             title: Text('Lyrics source'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuItem(
+          value: _VoceMenu.clientId,
+          child: ListTile(
+            leading: Icon(Icons.key),
+            title: Text('Spotify client ID'),
             contentPadding: EdgeInsets.zero,
           ),
         ),

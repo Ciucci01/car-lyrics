@@ -26,7 +26,6 @@ class _ContaRichieste implements LyricsProvider {
 
 void main() {
   setUp(() {
-    loadTestEnv();
     seedTokens();
   });
 

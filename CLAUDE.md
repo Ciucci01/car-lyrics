@@ -10,15 +10,15 @@ UI strings and user-facing error messages are in English; code comments are in I
 
 ## Setup
 
-`.env` is gitignored but declared as a Flutter **asset** in `pubspec.yaml` and loaded in `main()`. If it is missing or incomplete the app shows `ConfigErrorScreen` instead of crashing. A fresh clone needs it created at the repo root with:
+**There is no `.env` and no build-time configuration at all.** A fresh clone builds and runs; the app asks for what it needs on first launch. `flutter_dotenv` was removed along with the file.
 
-```
-SPOTIFY_CLIENT_ID=...
-```
+Both settings live in `SettingsProvider` and are typed inside the app: the Spotify **client ID**, asked for by `SpotifySetupScreen` before anything else, and the optional lyrics proxy address, under the overflow menu.
 
-That is the only key. The optional Spotify-lyrics proxy is **not** configured here: its address is a setting typed inside the app, under the overflow menu. It used to be a `LYRICS_BASE_URL` entry in this file, and moving it out is deliberate — an instance of `spotify-lyrics-api` is something each person hosts themselves, so baking one address into the bundle would ship somebody's private server inside everybody's APK and would make changing it a rebuild.
+The client ID moved out of `.env` in October 2026, after two signed APKs had already been published with one inside them and were withdrawn. The reason is in the [Developer Terms](https://developer.spotify.com/terms): a client ID is a *Security Code*, and §VI.1.2 requires it to be embedded "in a secure manner not accessible by third parties", while §VI.1.4 makes the registration's owner responsible for everything done with it. An asset in a public APK is neither — `unzip -p app.apk assets/flutter_assets/.env` was all it took. Keeping a `.env` fallback "for development" would have reinstated the problem the moment anyone built a release with the file present, which is why the dependency is gone rather than optional.
 
-No client secret: auth uses PKCE. The Spotify app registration must whitelist the redirect URI `car-play://callback`.
+The proxy address moved out earlier, for the adjacent reason: an instance of `spotify-lyrics-api` is something each person hosts themselves, so baking one address into the bundle would ship somebody's private server inside everybody's APK.
+
+No client secret: auth uses PKCE. Each user's own Spotify app registration must whitelist the redirect URI `car-lyrics://callback`.
 
 ## Commands
 
@@ -34,25 +34,28 @@ dart run flutter_launcher_icons    # regenerate launcher icons from assets/icon/
 
 Release signing reads `android/key.properties` (gitignored: `storeFile`, `storePassword`, `keyAlias`, `keyPassword`). Without that file the release build falls back to debug keys so `flutter run --release` still works locally.
 
-**Android is the only supported target.** `web/` builds and boots, but login cannot complete there — the PKCE flow returns to a `car-play://` custom scheme, which a browser tab has no way to hand back. Making web work would need an `http` redirect URI, a callback page served by the web app, and that URI added to the Spotify app registration; none of that exists. Since nothing in the app works without a session, a web build is a blank login screen. `usePathUrlStrategy()` in `main()` is the only web-specific line left, and it is a no-op elsewhere. `ios/`, `macos/`, `linux/` and `windows/` are untouched template scaffolding: the iOS bundle identifier was renamed alongside Android, the desktop ones still say `com.example`.
+**Android is the only supported target.** `web/` builds and boots, but login cannot complete there — the PKCE flow returns to a `car-lyrics://` custom scheme, which a browser tab has no way to hand back. Making web work would need an `http` redirect URI, a callback page served by the web app, and that URI added to the Spotify app registration; none of that exists. Since nothing in the app works without a session, a web build is a blank login screen. `usePathUrlStrategy()` in `main()` is the only web-specific line left, and it is a no-op elsewhere. `ios/`, `macos/`, `linux/` and `windows/` are untouched template scaffolding: the iOS bundle identifier was renamed alongside Android, the desktop ones still say `com.example`.
 
 ## Architecture
 
 One screen, no router, and two `ChangeNotifier`s.
 
 ```
-main.dart ──> MultiProvider ──> PlayerScreen
-                ├── PlayerProvider     (everything that comes from Spotify)
-                └── SettingsProvider   (how the user wants the screen to look)
-                                                          ├── LyricsListView         (auto-scrolling lyrics)
-                                                          ├── LyricsTextSizeButton   (AppBar, text size menu)
-                                                          ├── ReloadLyricsButton     (AppBar, refetch ignoring cache)
-                                                          ├── PlayerMenuButton       (AppBar, lyrics source + disconnect)
-                                                          └── PlayerControls         (prev / play-pause / next)
+main.dart ──> SettingsProvider ──> _Ingresso
+                                      │
+                   no client ID ──────┴────── client ID ──> PlayerProvider ──> PlayerScreen
+                          │                                                         │
+                   SpotifySetupScreen                   ├── LyricsListView         (auto-scrolling lyrics)
+                                                        ├── LyricsTextSizeButton   (AppBar, text size menu)
+                                                        ├── ReloadLyricsButton     (AppBar, refetch ignoring cache)
+                                                        ├── PlayerMenuButton       (AppBar, lyrics source · client ID · disconnect)
+                                                        └── PlayerControls         (prev / play-pause / next)
                             SpotifyAuthenticator opens the system browser during login
 ```
 
-**`PlayerProvider` holds all the state that comes from Spotify**, and that is the line between the two. `SettingsProvider` exists because a display preference has nothing to do with playback, tokens or timers, and has a persistence of its own; folding it into a class that is already several hundred lines of polling and auth would have been the only field in there that Spotify never sends. It is deliberately tiny: one preference, read once at startup, written when it changes.
+**`PlayerProvider` holds all the state that comes from Spotify**, and that is the line between the two. `SettingsProvider` holds what the user told the app: text size, lyrics proxy address, Spotify client ID. None of the three ever comes back from Spotify, which is the whole line — folding them into a class that is already several hundred lines of polling and auth would have put the only fields Spotify never sends in the middle of it.
+
+`main()` **awaits `SettingsProvider.ready` before `runApp`**, which nothing else in the app does, and the reason is the client ID: the first screen depends on whether one exists, and `_restore()` is async. Deciding on the not-yet-loaded value would show the setup screen for a frame to everyone who already has an ID. The constructor still returns synchronously, because `ChangeNotifierProvider` needs that; `ready` is how a caller waits for the stored values.
 
 Services are **instances wired through `PlayerProvider`'s factory constructor** (`TokenStorage` → `SpotifyAuth` → `SpotifyService`, plus `SpotifyAuthenticator` and the `LyricsRepository` chain), all injectable via named parameters. Nothing is static, so a fake `http.Client` is enough to exercise any of them.
 
@@ -83,7 +86,7 @@ Optimistic UI: `togglePlayPause` re-anchors from the current estimate and notifi
 
 The authorize URL opens in the **system browser**, per RFC 8252: `SpotifyAuthenticator` is a thin wrapper over `flutter_web_auth_2`, which uses Chrome Auth Tab on Android and `ASWebAuthenticationSession` on iOS. The user therefore types their password into a view the app does not control, and the federated "Continue with Google/Apple" buttons work — inside an embedded WebView they are often blocked, which locked out anyone whose account was created that way. This replaced the old in-app `SpotifyAuthWebView`.
 
-Because the callback arrives from outside the app, the custom scheme **is** registered: `com.linusu.flutter_web_auth_2.CallbackActivity` is declared in `AndroidManifest.xml` with an intent filter for `car-play`. iOS needs nothing in `Info.plist` — `ASWebAuthenticationSession` matches the scheme itself.
+Because the callback arrives from outside the app, the custom scheme **is** registered: `com.linusu.flutter_web_auth_2.CallbackActivity` is declared in `AndroidManifest.xml` with an intent filter for `car-lyrics`. iOS needs nothing in `Info.plist` — `ASWebAuthenticationSession` matches the scheme itself.
 
 `authenticate()` returns `null` when the user backs out — the plugin signals that as a `PlatformException` with code `CANCELED`, and cancelling is not an error worth showing. Any other `PlatformException` becomes a `SpotifyAuthResult` carrying its message, so the caller's flow is unchanged. That `'CANCELED'` is a magic string shared with a third-party plugin, so `spotify_authenticator_test.dart` pins it by substituting `FlutterWebAuth2Platform.instance` — the same seam `token_storage_test.dart` uses for the Keystore. If the constant ever moves upstream, a test says so instead of every cancellation silently turning into an error on screen.
 
@@ -152,11 +155,19 @@ State reaches the UI as `LyricsStatus` (`loading` / `ready` / `unavailable` / `i
 
 ### Lyrics source
 
-The proxy address lives in `SettingsProvider` next to the text size, and `main.dart` is what joins the two halves: `_CarPlayAppState` owns the one `SettingsProvider` and hands `PlayerProvider` a `() => settings.lyricsProxyUrl` closure. The dependency runs one way and only through that closure — `PlayerProvider` never learns that `SettingsProvider` exists, which is what keeps the line in Architecture honest.
+The proxy address lives in `SettingsProvider` next to the text size, and `main.dart` is what joins the two halves: `_CarLyricsAppState` owns the one `SettingsProvider` and hands `PlayerProvider` a `() => settings.lyricsProxyUrl` closure. The dependency runs one way and only through that closure — `PlayerProvider` never learns that `SettingsProvider` exists, which is what keeps the line in Architecture honest.
 
 `LyricsSourceDialog` validates before saving: empty is valid and means "no proxy", anything else has to be an absolute `http`/`https` URL with an authority. Without that check a typo would surface a song later as lyrics that refuse to load, which reads as a broken app rather than a wrong setting.
 
 `PlayerMenuButton` exists because the `AppBar` ran out of room at three icons, and because Disconnect next to the reload button is a logout by accident at a traffic light. Everything that is not needed while driving goes under the three dots.
+
+### Spotify client ID
+
+`SpotifyAuth` resolves it through a `String Function()` on every call rather than taking a `String` once, for the same reason `SpotifyProxyProvider` does: it is a setting the user can write, change or clear while the app runs. `_Ingresso` in `main.dart` hands `PlayerProvider` a `() => settings.spotifyClientId` closure, so the dependency still runs one way and `PlayerProvider` never learns that `SettingsProvider` exists.
+
+**`SpotifySetupScreen` is reachable from the overflow menu and not only at first launch, and that is not a convenience.** A mistyped ID fails at Spotify's own authorize page, which hands back an error the app can only report; without a way back to the field, a typo would lock the user out of an app that otherwise works, permanently.
+
+**Changing the ID must clear the session before the setting changes.** The stored refresh token was issued by the previous registration and is worthless to the new one. Leaving it produces a `401`, one wasted refresh, then `onAuthLost` — which does self-correct, but only after a round trip that reads on screen as a login that failed for no reason. The screen therefore calls `disconnect()` first, and it does so only when `canGoBack` is true: that flag means "reached from the menu", which is exactly the case where a `PlayerProvider` exists to disconnect. At first launch there is none, and reading one from the context would throw.
 
 ### Text size
 
