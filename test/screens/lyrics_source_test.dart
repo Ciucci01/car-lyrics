@@ -1,3 +1,4 @@
+import 'package:car_lyrics/models/proxy_auth.dart';
 import 'package:car_lyrics/providers/player_provider.dart';
 import 'package:car_lyrics/providers/settings_provider.dart';
 import 'package:car_lyrics/screens/player_menu_button.dart';
@@ -124,5 +125,55 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(settings.lyricsProxyUrl, '');
+  });
+
+  testMenu('le credenziali Basic arrivano alle impostazioni', (tester) async {
+    final settings = await pumpMenu(tester);
+    await apriDialogo(tester);
+
+    await tester.enterText(find.byType(TextField), 'http://192.168.1.10');
+    await tester.tap(find.text('None'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Username and password').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Username'), 'io');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Password'),
+      'segreta',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(settings.lyricsProxyUrl, 'http://192.168.1.10');
+    expect(settings.lyricsProxyAuth.header, 'Basic aW86c2VncmV0YQ==');
+  });
+
+  testMenu('un token vuoto non viene salvato', (tester) async {
+    final settings = await pumpMenu(tester);
+    await apriDialogo(tester);
+
+    await tester.enterText(find.byType(TextField), 'http://192.168.1.10');
+    await tester.tap(find.text('None'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bearer token').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a token'), findsOneWidget);
+    expect(settings.lyricsProxyUrl, '');
+  });
+
+  testMenu('svuotare l indirizzo butta anche le credenziali', (tester) async {
+    final settings = await pumpMenu(tester);
+    await settings.setLyricsProxyUrl('https://lyrics.example.com');
+    await settings.setLyricsProxyAuth(const ProxyAuth.bearer('abc'));
+
+    await apriDialogo(tester);
+    await tester.enterText(find.byType(TextField).first, '');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(settings.lyricsProxyAuth.type, ProxyAuthType.none);
   });
 }

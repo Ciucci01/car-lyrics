@@ -100,4 +100,35 @@ void main() {
       throwsA(isA<LyricsProviderException>()),
     );
   });
+
+  test('manda l header Authorization solo se impostato', () async {
+    String? auth = 'Bearer segreto';
+    final headers = <String?>[];
+    final provider = SpotifyProxyProvider(
+      baseUrl: () => 'https://proxy.example',
+      authorization: () => auth,
+      client: MockClient((request) async {
+        headers.add(request.headers['Authorization']);
+        return http.Response('', 404);
+      }),
+    );
+
+    await provider.fetch(_query);
+    auth = null;
+    await provider.fetch(_query);
+
+    expect(headers, ['Bearer segreto', null]);
+  });
+
+  test('un 401 del reverse proxy e una caduta, non un "non ce l ho"', () async {
+    final provider = SpotifyProxyProvider(
+      baseUrl: () => 'https://proxy.example',
+      client: MockClient((_) async => http.Response('', 401)),
+    );
+
+    expect(
+      () => provider.fetch(_query),
+      throwsA(isA<LyricsProviderException>()),
+    );
+  });
 }

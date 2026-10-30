@@ -85,6 +85,7 @@ class _Ingresso extends StatelessWidget {
       create: (_) => PlayerProvider(
         spotifyClientId: () => settings.spotifyClientId,
         lyricsProxyBaseUrl: () => settings.lyricsProxyUrl,
+        lyricsProxyAuthorization: () => settings.lyricsProxyAuth.header,
       ),
       child: const PlayerScreen(),
     );

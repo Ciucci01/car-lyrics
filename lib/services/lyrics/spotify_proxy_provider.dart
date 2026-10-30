@@ -16,10 +16,18 @@ class SpotifyProxyProvider implements LyricsProvider {
   /// l'indirizzo e' un'impostazione dell'app e puo' comparire, cambiare o
   /// sparire mentre l'app e' aperta.
   final String Function() baseUrl;
+
+  /// Valore dell'header `Authorization`, risolto anch'esso ad ogni richiesta;
+  /// `null` se il proxy non chiede autenticazione.
+  final String? Function() authorization;
   final http.Client _client;
 
-  SpotifyProxyProvider({required this.baseUrl, http.Client? client})
-    : _client = client ?? http.Client();
+  SpotifyProxyProvider({
+    required this.baseUrl,
+    String? Function()? authorization,
+    http.Client? client,
+  }) : authorization = authorization ?? (() => null),
+       _client = client ?? http.Client();
 
   @override
   String get name => 'spotify-proxy';
@@ -38,7 +46,10 @@ class SpotifyProxyProvider implements LyricsProvider {
     final uri = Uri.parse(
       base,
     ).replace(queryParameters: {'trackid': query.trackId});
-    final response = await _client.get(uri).timeout(_timeout);
+    final auth = authorization();
+    final response = await _client
+        .get(uri, headers: {if (auth != null) 'Authorization': auth})
+        .timeout(_timeout);
 
     if (response.statusCode == 404) return null;
     if (response.statusCode != 200) {

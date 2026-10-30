@@ -2,6 +2,7 @@ import 'package:car_lyrics/providers/player_provider.dart';
 import 'package:car_lyrics/providers/settings_provider.dart';
 import 'package:car_lyrics/screens/spotify_setup_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +27,12 @@ Future<SettingsProvider> _montaDaSola(WidgetTester tester) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    // `ready` legge anche le credenziali del proxy dal Keystore: senza il
+    // finto il canale nativo non risponde mai dentro testWidgets.
+    FlutterSecureStorage.setMockInitialValues({});
+  });
 
   testWidgets('mostra il redirect URI da registrare, per intero', (
     tester,

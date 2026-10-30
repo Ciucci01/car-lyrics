@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/lyrics_text_size.dart';
+import '../models/proxy_auth.dart';
 import '../utils/app_log.dart';
 
 /// Le preferenze di resa, tenute fuori da `PlayerProvider`: li' dentro tutto
@@ -11,10 +13,16 @@ class SettingsProvider with ChangeNotifier {
   static const _textSizeKey = 'lyrics_text_size';
   static const _proxyUrlKey = 'lyrics_proxy_url';
   static const _clientIdKey = 'spotify_client_id';
+  static const _proxyAuthKey = 'lyrics_proxy_auth';
+
+  /// Le credenziali del proxy sono un segreto e stanno nel Keystore come i
+  /// token Spotify, non in chiaro accanto all'indirizzo.
+  final FlutterSecureStorage _secure = const FlutterSecureStorage();
 
   LyricsTextSize _lyricsTextSize = LyricsTextSize.medium;
   String _lyricsProxyUrl = '';
   String _spotifyClientId = '';
+  ProxyAuth _lyricsProxyAuth = const ProxyAuth.none();
 
   /// Si completa quando le preferenze salvate sono state lette.
   ///
@@ -68,6 +76,28 @@ class SettingsProvider with ChangeNotifier {
     await _persist(_proxyUrlKey, pulito);
   }
 
+  ProxyAuth get lyricsProxyAuth => _lyricsProxyAuth;
+
+  /// Come per le altre preferenze, un salvataggio fallito vale comunque per
+  /// questa sessione.
+  Future<void> setLyricsProxyAuth(ProxyAuth auth) async {
+    _lyricsProxyAuth = auth;
+    notifyListeners();
+    try {
+      if (auth.type == ProxyAuthType.none) {
+        await _secure.delete(key: _proxyAuthKey);
+      } else {
+        await _secure.write(key: _proxyAuthKey, value: auth.toJson());
+      }
+    } catch (error, stackTrace) {
+      logError(
+        'Salvataggio delle credenziali del proxy fallito',
+        error,
+        stackTrace,
+      );
+    }
+  }
+
   Future<void> setLyricsTextSize(LyricsTextSize size) async {
     // Riscegliere la taglia gia' attiva non e' un cambiamento visibile, e
     // ridisegnerebbe la lista per niente.
@@ -95,18 +125,31 @@ class SettingsProvider with ChangeNotifier {
       final size = LyricsTextSize.fromName(prefs.getString(_textSizeKey));
       final proxy = prefs.getString(_proxyUrlKey)?.trim() ?? '';
       final clientId = prefs.getString(_clientIdKey)?.trim() ?? '';
-      if (size == _lyricsTextSize &&
-          proxy == _lyricsProxyUrl &&
-          clientId == _spotifyClientId) {
-        return;
+      if (size != _lyricsTextSize ||
+          proxy != _lyricsProxyUrl ||
+          clientId != _spotifyClientId) {
+        _lyricsTextSize = size;
+        _lyricsProxyUrl = proxy;
+        _spotifyClientId = clientId;
+        notifyListeners();
       }
-
-      _lyricsTextSize = size;
-      _lyricsProxyUrl = proxy;
-      _spotifyClientId = clientId;
-      notifyListeners();
     } catch (error, stackTrace) {
       logError('Lettura delle preferenze fallita', error, stackTrace);
+    }
+
+    // In un try suo: un Keystore illeggibile non deve costare le preferenze
+    // in chiaro, e vale come "nessuna autenticazione".
+    try {
+      final raw = await _secure.read(key: _proxyAuthKey);
+      if (raw == null) return;
+      _lyricsProxyAuth = ProxyAuth.fromJson(raw);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      logError(
+        'Lettura delle credenziali del proxy fallita',
+        error,
+        stackTrace,
+      );
     }
   }
 }

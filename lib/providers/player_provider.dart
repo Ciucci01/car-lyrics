@@ -79,6 +79,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
     LyricsRepository? lyricsRepository,
     String Function()? lyricsProxyBaseUrl,
     String Function()? spotifyClientId,
+    String? Function()? lyricsProxyAuthorization,
   }) {
     // Un solo client per tutta l'app: tre client sono tre pool di
     // connessioni separati per lo stesso identico traffico.
@@ -94,6 +95,7 @@ class PlayerProvider with ChangeNotifier, WidgetsBindingObserver {
       // impostazione, e puo' comparire mentre l'app e' gia' aperta.
       SpotifyProxyProvider(
         baseUrl: lyricsProxyBaseUrl ?? () => '',
+        authorization: lyricsProxyAuthorization,
         client: httpClient,
       ),
       LrclibProvider(client: httpClient),
