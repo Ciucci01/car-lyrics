@@ -28,18 +28,15 @@ In landscape the transport controls move to the right edge, leaving the full hei
 
 ## Running it
 
-You need your own Spotify app registration — the client ID is not in this repo, and it could not usefully be: see the note below.
+You need your own Spotify app registration. The app asks for it on first launch and keeps it on the phone — it is not baked into the build, and no build in this repo contains one.
 
-1. Create an app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and add `car-play://callback` as a redirect URI.
-2. Put the client ID in a `.env` file at the repo root:
-   ```
-   SPOTIFY_CLIENT_ID=...
-   ```
-3. Build and run:
+1. Create an app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and add `car-lyrics://callback` as a redirect URI.
+2. Build and run:
    ```bash
    flutter pub get
    flutter run -d <device>
    ```
+3. Paste the client ID into the first screen. To change it later: three-dot menu → **Spotify client ID**.
 
 There is no client secret anywhere: login uses the authorization-code flow with PKCE, in the system browser.
 
@@ -47,7 +44,13 @@ The optional lyrics proxy is **not** configured at build time. Its address is ty
 
 ### Why you need your own registration
 
-Spotify app registrations start in Development Mode, which only lets accounts the owner has added by hand — up to 25 — complete the login. Lifting that cap means an Extended Quota Mode review aimed at products with real user numbers. So a prebuilt APK signed with somebody else's client ID would reject everyone but that somebody's 25 invitees, and shipping one would be a worse experience than these three steps.
+Two reasons, and the second is the one that decided it.
+
+Spotify app registrations start in Development Mode, which only lets accounts the owner has added by hand in the dashboard complete the login — a handful of them. So a prebuilt APK carrying somebody else's client ID would reject everyone but that somebody's invitees. With your own registration you are the invitee, which is all you need.
+
+The other reason is that the [Developer Terms](https://developer.spotify.com/terms) treat a client ID as a Security Code and require it to be embedded "in a secure manner not accessible by third parties". A `.env` file inside a public APK is not that — one `unzip` reads it — and whoever owns the registration stays responsible for everything done with it. Since July 2026 the Web API quota is counted per developer account rather than per app, so a leaked ID drains the budget of everything that account owns.
+
+That is why the client ID is typed into the app instead of compiled into it, and why there is no APK attached to the releases here.
 
 A Spotify **Premium** account is also required: the Web API refuses playback commands for free accounts. The lyrics still show.
 

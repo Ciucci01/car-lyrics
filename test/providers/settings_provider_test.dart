@@ -13,11 +13,11 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
   });
 
-  /// Il ripristino parte non atteso dal costruttore, come in PlayerProvider:
-  /// il provider deve restare sincrono per ChangeNotifierProvider.
+  /// Il costruttore resta sincrono per ChangeNotifierProvider, quindi il
+  /// ripristino si attende a parte: e' la stessa cosa che fa `main`.
   Future<SettingsProvider> ripristinato() async {
     final settings = SettingsProvider();
-    await pumpEventQueue();
+    await settings.ready;
     return settings;
   }
 
@@ -169,5 +169,57 @@ void main() {
         'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==',
       );
     });
+  });
+
+  group('il client id di Spotify', () {
+    test('parte vuoto: non viene da nessun file incluso nella build', () async {
+      expect((await ripristinato()).spotifyClientId, '');
+    });
+
+    test('si rilegge all avvio successivo, senza spazi intorno', () async {
+      await (await ripristinato()).setSpotifyClientId('  abc123  ');
+
+      expect((await ripristinato()).spotifyClientId, 'abc123');
+    });
+
+    test('avvisa chi ascolta solo quando cambia davvero', () async {
+      final settings = await ripristinato();
+      var avvisi = 0;
+      settings.addListener(() => avvisi++);
+
+      await settings.setSpotifyClientId('abc123');
+      expect(avvisi, 1);
+
+      await settings.setSpotifyClientId(' abc123 ');
+      expect(avvisi, 1);
+    });
+
+    test('convive con le altre due preferenze', () async {
+      final settings = await ripristinato();
+      await settings.setSpotifyClientId('abc123');
+      await settings.setLyricsProxyUrl('https://lyrics.example.com');
+      await settings.setLyricsTextSize(LyricsTextSize.huge);
+
+      final riletto = await ripristinato();
+      expect(riletto.spotifyClientId, 'abc123');
+      expect(riletto.lyricsProxyUrl, 'https://lyrics.example.com');
+      expect(riletto.lyricsTextSize, LyricsTextSize.huge);
+    });
+
+    test(
+      'ready si completa prima che il valore salvato sia leggibile',
+      () async {
+        SharedPreferences.setMockInitialValues({'spotify_client_id': 'abc123'});
+
+        // Senza attendere `ready` si leggerebbe ancora il vuoto iniziale, ed e'
+        // il motivo per cui main lo attende: deciderlo prima farebbe comparire
+        // la schermata di configurazione a chi un client id ce l'ha gia'.
+        final settings = SettingsProvider();
+        expect(settings.spotifyClientId, '');
+
+        await settings.ready;
+        expect(settings.spotifyClientId, 'abc123');
+      },
+    );
   });
 }

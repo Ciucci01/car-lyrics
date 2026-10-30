@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +12,7 @@ import '../utils/app_log.dart';
 class SettingsProvider with ChangeNotifier {
   static const _textSizeKey = 'lyrics_text_size';
   static const _proxyUrlKey = 'lyrics_proxy_url';
+  static const _clientIdKey = 'spotify_client_id';
   static const _proxyAuthKey = 'lyrics_proxy_auth';
 
   /// Le credenziali del proxy sono un segreto e stanno nel Keystore come i
@@ -22,16 +21,43 @@ class SettingsProvider with ChangeNotifier {
 
   LyricsTextSize _lyricsTextSize = LyricsTextSize.medium;
   String _lyricsProxyUrl = '';
+  String _spotifyClientId = '';
   ProxyAuth _lyricsProxyAuth = const ProxyAuth.none();
 
-  /// Il ripristino parte non atteso, come in `PlayerProvider`: il costruttore
-  /// deve restare sincrono per `ChangeNotifierProvider`. Fino a quel momento
-  /// vale il valore di default, che e' quello che l'app ha sempre usato.
+  /// Si completa quando le preferenze salvate sono state lette.
+  ///
+  /// Serve a `main`, che deve sapere se un client id c'e' gia' prima di
+  /// decidere quale schermata aprire: senza attenderlo, al primo frame il
+  /// valore e' ancora vuoto e la configurazione lampeggerebbe a ogni avvio.
+  late final Future<void> ready;
+
+  /// Il costruttore resta sincrono per `ChangeNotifierProvider`; chi ha
+  /// bisogno dei valori salvati attende [ready].
   SettingsProvider() {
-    unawaited(_restore());
+    ready = _restore();
   }
 
   LyricsTextSize get lyricsTextSize => _lyricsTextSize;
+
+  /// Client id della registrazione Spotify di chi usa l'app.
+  ///
+  /// Vuoto significa "non configurata", e l'app apre la schermata di
+  /// impostazione invece del player. Non ha un valore predefinito e non
+  /// viene letto da nessun file incluso nella build: i termini di Spotify
+  /// chiedono che un Security Code stia dentro l'app "in a secure manner not
+  /// accessible by third parties", e un APK pubblico non e' quel posto.
+  String get spotifyClientId => _spotifyClientId;
+
+  /// Chi cambia il client id deve anche chiudere la sessione in corso: i
+  /// token sono stati emessi per un'altra registrazione e non valgono piu'.
+  Future<void> setSpotifyClientId(String id) async {
+    final pulito = id.trim();
+    if (pulito == _spotifyClientId) return;
+
+    _spotifyClientId = pulito;
+    notifyListeners();
+    await _persist(_clientIdKey, pulito);
+  }
 
   /// Indirizzo di un'istanza di spotify-lyrics-api, provata prima di LRCLIB.
   ///
@@ -98,9 +124,13 @@ class SettingsProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final size = LyricsTextSize.fromName(prefs.getString(_textSizeKey));
       final proxy = prefs.getString(_proxyUrlKey)?.trim() ?? '';
-      if (size != _lyricsTextSize || proxy != _lyricsProxyUrl) {
+      final clientId = prefs.getString(_clientIdKey)?.trim() ?? '';
+      if (size != _lyricsTextSize ||
+          proxy != _lyricsProxyUrl ||
+          clientId != _spotifyClientId) {
         _lyricsTextSize = size;
         _lyricsProxyUrl = proxy;
+        _spotifyClientId = clientId;
         notifyListeners();
       }
     } catch (error, stackTrace) {

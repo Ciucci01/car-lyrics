@@ -12,7 +12,6 @@ import '../support/fakes.dart';
 
 void main() {
   setUp(() {
-    loadTestEnv();
     seedTokens();
     SharedPreferences.setMockInitialValues({});
   });
